@@ -188,29 +188,37 @@ body{
   const SHOW_NAME = "Marko";                 // put your brother's name or leave empty
   const GIFT_URL = "https://YOUR-GIFT-LINK.example.com";
 
-  // ——— Basic UI wiring ———
- (function(){
-    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+//Theme switch
+
+  // THEME TOGGLE — respects system preference first time, then remembers choice
+  (function () {
+    const btn = document.getElementById('themeToggle'); // define first
+
+    function setTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      const isLight = t === 'light';
+      if (btn) { // guard in case button isn't present yet
+        btn.textContent = isLight ? '☀️' : '🌙';
+        btn.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+      }
+    }
+
     const saved = localStorage.getItem('w2t-theme');
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
     const theme = saved || (prefersLight ? 'light' : 'dark');
     setTheme(theme);
 
-    const btn = document.getElementById('themeToggle');
-    btn.addEventListener('click', ()=>{
-      const next = (document.documentElement.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
-      setTheme(next);
-      localStorage.setItem('w2t-theme', next);
-    });
-
-    function setTheme(t){
-      document.documentElement.setAttribute('data-theme', t);
-      const isLight = t === 'light';
-      btn.textContent = isLight ? '☀️' : '🌙';
-      btn.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const next = (document.documentElement.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+        setTheme(next);
+        localStorage.setItem('w2t-theme', next);
+      });
     }
   })();
 
   
+  // ——— Basic UI wiring ———  
   document.getElementById("year").textContent = new Date().getFullYear();
   if (SHOW_NAME) document.getElementById("nameSlot").textContent = ", " + SHOW_NAME;
   document.getElementById("giftLink").setAttribute("href", GIFT_URL);

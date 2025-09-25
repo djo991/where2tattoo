@@ -51,8 +51,11 @@ body{
 
 /* cards / buttons remain the same but use tokens */
 .card{
-  background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));
-  border:1px solid var(--line); border-radius:16px; padding:22px 18px;
+  background: var(--bg-soft);                    /* solid surface */
+  border: 1px solid color-mix(in oklab, var(--fg) 8%, transparent);
+  border-radius: 16px;
+  padding: 22px 18px;
+  box-shadow: 0 1px 0 color-mix(in oklab, #000 40%, transparent); /* subtle lift */
 }
 .button{
   appearance:none;
@@ -64,10 +67,17 @@ body{
 .button.ghost{
   background:transparent; color:var(--fg); border:1px solid var(--line); box-shadow:none
 }
-.button.small{ padding:8px 12px; border-radius:10px; font-weight:600; }
+.button.small{ padding:8px 12px;min-height:38px; border-radius:10px; font-weight:600; }
 
 /* header actions */
 .header-actions{display:flex; align-items:center; gap:10px}
+  header{
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(6px);
+  background: color-mix(in oklab, var(--bg) 85%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--fg) 6%, transparent);
+  padding: 12px 20px; border-radius: 16px;  /* keeps your shape when stuck */
+}
 .theme-toggle{
   display:inline-flex; align-items:center; justify-content:center;
   width:38px; height:38px; border-radius:10px;
@@ -81,7 +91,6 @@ body{
 @media (min-width:900px){ .logo-img{height:44px} }
 
   .wrap{max-width:980px;margin:0 auto;padding:56px 20px 96px}
-  header{display:flex;align-items:center;justify-content:space-between;gap:16px}
   .logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--fg)}
   .logo-badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--ink),var(--accent));display:grid;place-items:center;font-weight:800}
   .logo-text{font-weight:800;letter-spacing:.2px}
@@ -101,8 +110,19 @@ body{
   .success{color:var(--ok);font-weight:700}
   .hint{color:var(--warn)}
   .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:24px}
-  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+  footer{
+  margin-top: 48px;
+  padding: 18px 0 32px;
+  border-top: 1px solid color-mix(in oklab, var(--fg) 6%, transparent);
+  color: var(--muted);
+  font-size: .9rem;
+}
   .needle{border-bottom:1px dotted var(--line);cursor:help}
+  :focus-visible{
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
 </style>
 </head>
 <body>
@@ -143,8 +163,8 @@ body{
       <div class="reveal" id="reveal">
         <p class="success">✔ Unlocked!</p>
         <p>
-          You’ve come this far using your wits—now use them to make this real. Start small: one city, ten artists, a waitlist.
-          Talk to people before pixels. Ship weekly. Keep the <span class="needle" title="Needle #2">linework</span> clean and shade as you go.
+          You’ve come this far using your wits - now use them to make this real. Start small: one city, ten artists, a waitlist.
+          Talk to people before pixels. Update weekly.
           We believe in you. This is your canvas.
         </p>
         <div class="puzzle">
@@ -186,7 +206,7 @@ body{
   // ——— Settings you can tweak ———
   const SECRET_CODE = "INK";                 // puzzle answer (uppercase)
   const SHOW_NAME = "Marko";                 // put your brother's name or leave empty
-  const GIFT_URL = "https://YOUR-GIFT-LINK.example.com";
+  const GIFT_URL = "https://drive.google.com/file/d/1WwiMPd_vuV63-vZd_YKrkOYO5AIeQuY7/view?usp=drive_link";
 
 //Theme switch
 

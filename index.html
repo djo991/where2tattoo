@@ -65,7 +65,7 @@ body{
   box-shadow:var(--shadow); cursor:pointer
 }
 .button.ghost{ border:1px solid color-mix(in oklab, var(--fg) 16%, transparent); }
-.button.small{ padding:8px 12px; min-height:38px; border-radius:10px; font-weight:600; }
+.button.small{ padding:8px 12px; min-height:16px; border-radius:10px; font-weight:600; }
 
 /* header actions */
 .header-actions{ display:flex; align-items:center; gap:10px }
@@ -256,7 +256,7 @@ body{
 
   function unlock() {
     const val = (input.value || "").trim().toUpperCase();
-    if (!val) { msg.textContent = "Try a three-letter word artists can’t work without. (Pro tip: ←, ←, →)"; return; }
+    if (!val) { msg.textContent = "Try a three-letter word artists can’t work without."; return; }
     if (val === SECRET_CODE) {
       reveal.style.display = "block";
       msg.innerHTML = '<span class="success">Nice.</span> Welcome inside.';
@@ -266,7 +266,7 @@ body{
   }
   btn.addEventListener("click", unlock);
   input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") unlock(); });
-  hintBtn.addEventListener("click", ()=>{ msg.innerHTML = '<span class="hint">Hint:</span> It goes in the machine, not the power supply.' });
+  hintBtn.addEventListener("click", ()=>{ msg.innerHTML = '<span class="hint">Hint:</span> The machine drinks it; the skin remembers it.' });
 
   // ——— WebAudio: thunder (first keypress unlocks AudioContext) ———
   let audioCtx = null, masterGain = null, comp = null;

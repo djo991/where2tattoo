@@ -65,12 +65,9 @@
   .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:24px}
   footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
   .needle{border-bottom:1px dotted var(--line);cursor:help}
-  /* effects canvas on top */
-  canvas#confetti{position:fixed;inset:0;pointer-events:none;opacity:.95}
 </style>
 </head>
 <body>
-<canvas id="confetti" width="0" height="0" aria-hidden="true"></canvas>
 <div class="wrap">
 
   <header>
@@ -92,8 +89,7 @@
       <h1>Happy Birthday<span id="nameSlot"></span>! 🎉</h1>
       <p class="sub">
         We left these breadcrumbs because we believe in the thing you’ll build.<br>
-        You’ve followed the trail, read the signs, and found the door.<br>
-        Pro tip: try <span class="needle" title="←, ←, →">Raiden’s Electric Fly</span>.
+        You’ve followed the trail, read the signs, and found the door.
       </p>
 
       <div class="puzzle">
@@ -101,7 +97,9 @@
         <button class="button" id="unlock">Unlock</button>
         <button class="button ghost" id="hintBtn">Need a hint?</button>
       </div>
-      <div class="msg" id="msg" role="status">Speak the three-letter word every artist needs.</div>
+      <div class="msg" id="msg" role="status">
+        Type the code and press <b>Unlock</b>. (Pro tip: try Raiden’s Electric Fly: ←, ←, →)
+      </div>
 
       <div class="reveal" id="reveal">
         <p class="success">✔ Unlocked!</p>
@@ -164,7 +162,7 @@
 
   function unlock() {
     const val = (input.value || "").trim().toUpperCase();
-    if (!val) { msg.textContent = "Try a three-letter word artists can’t work without."; return; }
+    if (!val) { msg.textContent = "Try a three-letter word artists can’t work without. (Pro tip: ←, ←, →)"; return; }
     if (val === SECRET_CODE) {
       reveal.style.display = "block";
       msg.innerHTML = '<span class="success">Nice.</span> Welcome inside.';
@@ -176,6 +174,44 @@
   input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") unlock(); });
   hintBtn.addEventListener("click", ()=>{ msg.innerHTML = '<span class="hint">Hint:</span> It goes in the machine, not the power supply.' });
 
+  // ——— WebAudio crackle (first keypress unlocks the AudioContext) ———
+  let audioCtx = null, masterGain = null;
+  function ensureAudio(){
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6; masterGain.connect(audioCtx.destination);
+  }
+  function zapAudio(){
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+
+    // white noise burst
+    const noiseDur = 0.12;
+    const buffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate*noiseDur), audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<data.length;i++){ data[i] = (Math.random()*2-1) * (1 - i/data.length); } // decay
+    const noise = audioCtx.createBufferSource(); noise.buffer = buffer;
+
+    const bandpass = audioCtx.createBiquadFilter();
+    bandpass.type = "bandpass"; bandpass.frequency.value = 3000; bandpass.Q.value = 3;
+
+    const ng = audioCtx.createGain(); ng.gain.setValueAtTime(0.0, now);
+    ng.gain.linearRampToValueAtTime(0.9, now+0.01);
+    ng.gain.exponentialRampToValueAtTime(0.02, now+noiseDur);
+
+    noise.connect(bandpass).connect(ng).connect(masterGain);
+    noise.start(now); noise.stop(now+noiseDur);
+
+    // short sizzle tone
+    const osc = audioCtx.createOscillator();
+    osc.type = "square"; osc.frequency.setValueAtTime(160, now);
+    const og = audioCtx.createGain(); og.gain.setValueAtTime(0.8, now);
+    og.gain.exponentialRampToValueAtTime(0.01, now+0.08);
+    osc.connect(og).connect(masterGain);
+    osc.start(now); osc.stop(now+0.09);
+  }
+  window.addEventListener("keydown", ensureAudio, { once:true });
+
   // ——— Raiden's Electric Fly (←, ←, →) → lightning (repeatable/spammable) ———
   const RAIDENTRIC = ["ArrowLeft","ArrowLeft","ArrowRight"];
   let seq = [];
@@ -184,57 +220,76 @@
     if (seq.length > RAIDENTRIC.length) seq.shift();
     if (RAIDENTRIC.every((k,i)=>seq[i]===k)) {
       strikeLightning();               // fire lightning
+      zapAudio();                      // play crackle
       msg.innerHTML = '⚡ Nice, but now solve the riddle!';
     }
   });
 
-  // ——— Lightning effect (stackable) ———
-  const cvs = document.getElementById("confetti"), ctx = cvs.getContext("2d");
-  function resize(){ cvs.width = innerWidth; cvs.height = innerHeight; }
-  addEventListener("resize", resize); resize();
+  // ——— Lightning effect: create canvas on demand, randomize, remove when done ———
+  let cvs = null, ctx = null, strikes = [], animating = false, fadeTimer = null;
 
-  let strikes = [];    // active strikes
+  function ensureCanvas(){
+    if (cvs) return;
+    cvs = document.createElement('canvas');
+    cvs.id = 'fx';
+    Object.assign(cvs.style, {position:'fixed', inset:'0', pointerEvents:'none', opacity:'0.95'});
+    document.body.appendChild(cvs);
+    ctx = cvs.getContext('2d');
+    resize();
+    window.addEventListener('resize', resize);
+  }
+  function removeCanvas(){
+    if (!cvs) return;
+    window.removeEventListener('resize', resize);
+    cvs.remove(); cvs = null; ctx = null;
+  }
+  function resize(){ if (cvs){ cvs.width = innerWidth; cvs.height = innerHeight; } }
 
   function strikeLightning() {
-    const STRIKE_MS = 600 + Math.random()*400; // duration per strike
-    const born = performance.now();
-    // create a bolt with a jagged path
-    const makeBolt = () => {
-      const x = Math.random()*cvs.width;
-      const y0 = -20, y1 = cvs.height*0.9*Math.random()*0.6 + cvs.height*0.3;
+    ensureCanvas();
+    const boltCount = 2 + Math.floor(Math.random()*3); // 2–4 bolts per trigger
+    const STRIKE_MS = 500 + Math.random()*500;
+
+    for (let b=0;b<boltCount;b++){
+      const startX = Math.random()*cvs.width;           // random across sky
+      const endY = cvs.height*(0.4 + Math.random()*0.5); // random depth
       const segs = 8 + Math.floor(Math.random()*6);
       const pts = [];
-      let px = x, py = y0;
+      let px = startX, py = -20;
       for (let i=1;i<=segs;i++){
-        const ny = y0 + (y1 - y0) * (i/segs);
-        const nx = px + (Math.random()-0.5) * 90; // side jitter
-        pts.push([nx, ny]);
-        px = nx; py = ny;
+        const ny = -20 + (endY + 20) * (i/segs);
+        const spread = 70 + (i*8); // wider as it falls
+        const nx = px + (Math.random()*spread - spread/2);
+        pts.push([nx, ny]); px = nx; py = ny;
       }
-      return {pts, branch: Math.random()<0.6};
-    };
-    strikes.push({born, life: STRIKE_MS, bolts: [makeBolt(), makeBolt(), makeBolt()]});
+      strikes.push({
+        born: performance.now(),
+        life: STRIKE_MS,
+        pts,
+        branch: Math.random()<0.7
+      });
+    }
+
     if (!animating) animate();
   }
 
-  let animating = false;
   function animate() {
     animating = true;
     const now = performance.now();
-    // clear with slight dark overlay to keep a faint afterglow
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
+
+    // semi-clear with dark overlay for afterglow
+    ctx.fillStyle = "rgba(0,0,0,0.30)";
     ctx.fillRect(0,0,cvs.width,cvs.height);
 
-    // draw each active strike
     for (let i = strikes.length - 1; i >= 0; i--) {
       const s = strikes[i];
       const t = now - s.born;
       const p = Math.min(1, t / s.life);
       const alpha = (1 - p) * 0.95 + 0.05;
 
-      // occasional white flash
-      if (t < 120) {
-        ctx.fillStyle = `rgba(255,255,255,${0.18 * (1 - t/120)})`;
+      // quick flash at start
+      if (t < 110) {
+        ctx.fillStyle = `rgba(255,255,255,${0.18 * (1 - t/110)})`;
         ctx.fillRect(0,0,cvs.width,cvs.height);
       }
 
@@ -243,33 +298,38 @@
       ctx.shadowColor = "rgba(255,255,255,0.9)";
       ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
 
-      s.bolts.forEach(b=>{
-        ctx.beginPath();
-        // start near cloud top
-        const startX = b.pts[0][0], startY = -10;
-        ctx.moveTo(startX, startY);
-        for (let j=0;j<b.pts.length;j++){
-          const [bx, by] = b.pts[j];
-          ctx.lineTo(bx + (Math.random()-0.5)*4, by + (Math.random()-0.5)*4);
-          // small branches
-          if (b.branch && Math.random()<0.2){
-            ctx.moveTo(bx,by);
-            ctx.lineTo(bx + (Math.random()*60-30), by + (Math.random()*60));
-          }
+      ctx.beginPath();
+      ctx.moveTo(s.pts[0][0], -10);
+      for (let j=0;j<s.pts.length;j++){
+        const [bx, by] = s.pts[j];
+        ctx.lineTo(bx + (Math.random()-0.5)*4, by + (Math.random()-0.5)*4);
+        // tiny branches
+        if (s.branch && Math.random()<0.18){
+          ctx.moveTo(bx,by);
+          ctx.lineTo(bx + (Math.random()*60-30), by + (Math.random()*60));
+          ctx.moveTo(bx,by);
         }
-        ctx.stroke();
-      });
+      }
+      ctx.stroke();
 
       if (t > s.life) strikes.splice(i, 1);
     }
 
     if (strikes.length) {
       requestAnimationFrame(animate);
+      if (fadeTimer){ clearTimeout(fadeTimer); fadeTimer = null; }
     } else {
-      animating = false;
-      // final gentle fade
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
-      ctx.fillRect(0,0,cvs.width,cvs.height);
+      // no more strikes: fade out, then remove canvas entirely
+      if (!fadeTimer){
+        fadeTimer = setTimeout(()=>{
+          if (!cvs) return;
+          ctx.fillStyle = "rgba(0,0,0,0.5)";
+          ctx.fillRect(0,0,cvs.width,cvs.height);
+          removeCanvas();
+          animating = false;
+          fadeTimer = null;
+        }, 200); // brief tail
+      }
     }
   }
 </script>

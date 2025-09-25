@@ -64,25 +64,31 @@ body{
   text-decoration:none; display:inline-flex; align-items:center; gap:10px;
   box-shadow:var(--shadow); cursor:pointer
 }
-.button.ghost{
-  background:transparent; color:var(--fg); border:1px solid var(--line); box-shadow:none
-}
-.button.small{ padding:8px 12px;; border-radius:10px; font-weight:600; }
+.button.ghost{ border:1px solid color-mix(in oklab, var(--fg) 16%, transparent); }
+.button.small{ padding:8px 12px; min-height:38px; border-radius:10px; font-weight:600; }
 
 /* header actions */
-.header-actions{display:flex; align-items:center; gap:10px}
+.header-actions{ display:flex; align-items:center; gap:10px }
   header{
+    display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+
+  /* sticky / style */
   position: sticky; top: 0; z-index: 50;
   backdrop-filter: blur(6px);
   background: color-mix(in oklab, var(--bg) 85%, transparent);
   border-bottom: 1px solid color-mix(in oklab, var(--fg) 6%, transparent);
-  padding: 12px 20px; border-radius: 16px;  /* keeps your shape when stuck */
+  padding: 12px 20px;
+  border-radius: 16px;
+  margin-bottom: 18px; /* bit of breathing room under the header */
 }
 .theme-toggle{
   display:inline-flex; align-items:center; justify-content:center;
   width:38px; height:38px; border-radius:10px;
   background:transparent; border:1px solid var(--line); color:var(--fg);
-  cursor:pointer
+  cursor:pointer;
 }
 .theme-toggle:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
 
@@ -95,7 +101,6 @@ body{
   .logo-badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--ink),var(--accent));display:grid;place-items:center;font-weight:800}
   .logo-text{font-weight:800;letter-spacing:.2px}
   .motto{margin:18px 0 0;color:var(--muted);font-size:.95rem}
-  .cta-minis a{color:var(--muted);text-decoration:none;font-size:.95rem;margin-left:16px;border-bottom:1px dashed var(--line)}
   main{margin-top:40px}
   .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
   @media (max-width:900px){ .hero{grid-template-columns:1fr } }

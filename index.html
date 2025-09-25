@@ -18,19 +18,68 @@
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0f0f12; --fg:#eaeaf0; --muted:#b9b9c6; --accent:#7cf7d4; --ink:#9b8cff;
-    --card:#15161b; --line:#23242b; --ok:#58d69c; --warn:#ffd085;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
-    color:var(--fg); background:
-      radial-gradient(1200px 800px at 10% -10%, #1a1b22 0%, transparent 60%),
-      radial-gradient(1000px 700px at 90% 0%, #161722 0%, transparent 60%),
-      var(--bg);
-  }
+  /* THEME TOKENS
+   - default = dark
+   - light overrides below via [data-theme="light"]
+*/
+:root{
+  --bg:#0f1115; --bg-soft:#15161b;
+  --fg:#eaeaf0; --muted:#b9b9c6;
+  --line:#23242b;
+  --accent:#7cf7d4; --ink:#9b8cff; /* gradient endpoints */
+  --ok:#58d69c; --warn:#ffd085;
+  --shadow: 0 10px 30px rgba(124,247,212,.15);
+}
+
+/* light theme overrides */
+:root[data-theme="light"]{
+  --bg:#f8f9fb; --bg-soft:#ffffff;
+  --fg:#0f1115; --muted:#5c5f6a;
+  --line:#e7e9ee;
+  --shadow: 0 10px 24px rgba(123, 134, 255, .12);
+}
+
+html,body{height:100%}
+body{
+  margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+  color:var(--fg);
+  background:
+    radial-gradient(1100px 700px at 10% -10%, rgba(255,255,255,.03) 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 0%, rgba(255,255,255,.03) 0%, transparent 60%),
+    var(--bg);
+}
+
+/* cards / buttons remain the same but use tokens */
+.card{
+  background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));
+  border:1px solid var(--line); border-radius:16px; padding:22px 18px;
+}
+.button{
+  appearance:none;
+  background:linear-gradient(135deg,var(--ink),var(--accent));
+  color:#111; border:none; padding:12px 16px; border-radius:12px; font-weight:700;
+  text-decoration:none; display:inline-flex; align-items:center; gap:10px;
+  box-shadow:var(--shadow); cursor:pointer
+}
+.button.ghost{
+  background:transparent; color:var(--fg); border:1px solid var(--line); box-shadow:none
+}
+.button.small{ padding:8px 12px; border-radius:10px; font-weight:600; }
+
+/* header actions */
+.header-actions{display:flex; align-items:center; gap:10px}
+.theme-toggle{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; border-radius:10px;
+  background:transparent; border:1px solid var(--line); color:var(--fg);
+  cursor:pointer
+}
+.theme-toggle:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+
+/* logo image if you’re using it */
+.logo-img{height:36px;width:auto;display:block}
+@media (min-width:900px){ .logo-img{height:44px} }
+
   .wrap{max-width:980px;margin:0 auto;padding:56px 20px 96px}
   header{display:flex;align-items:center;justify-content:space-between;gap:16px}
   .logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--fg)}
@@ -43,11 +92,8 @@
   @media (max-width:900px){ .hero{grid-template-columns:1fr } }
   h1{font-size:clamp(1.9rem,3.5vw,2.8rem);line-height:1.08;margin:.2em 0}
   .sub{color:var(--muted);font-size:1.05rem}
-  .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0)); border:1px solid var(--line); border-radius:16px; padding:22px 18px;}
   .bullets{display:grid;gap:10px;margin:12px 0 4px}
   .bullets b{color:var(--fg)}
-  .button{appearance:none;background:linear-gradient(135deg,var(--ink),var(--accent)); color:#111;border:none;padding:12px 16px;border-radius:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(124,247,212,.15);cursor:pointer}
-  .button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);box-shadow:none}
   .puzzle{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
   .puzzle input{background:#0c0d11;border:1px solid var(--line);color:var(--fg);padding:12px 14px;border-radius:12px;min-width:220px;letter-spacing:.2em;text-transform:uppercase}
   .msg{margin-top:12px;color:var(--muted)}
@@ -57,8 +103,6 @@
   .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:24px}
   footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
   .needle{border-bottom:1px dotted var(--line);cursor:help}
-  .logo-img{height:36px;width:auto;display:block}
-@media (min-width:900px){ .logo-img{height:44px} }
 </style>
 </head>
 <body>
@@ -72,10 +116,11 @@
     <div class="motto">The shortest distance between you and your perfect tattoo.</div>
   </div>
 </a>
-    <nav class="cta-minis">
-      <a href="mailto:abatklaudija@gmail.com?subject=Where2Tattoo">Email</a>
-      <a href="mailto:abatklaudija@gmail.com?subject=Where2Tattoo%20Artist%20Waitlist">Artist waitlist</a>
-    </nav>
+   <nav class="header-actions">
+  <a class="button small" href="mailto:abatklaudija@gmail.com?subject=Where2Tattoo">Email</a>
+  <a class="button small ghost" href="mailto:abatklaudija@gmail.com?subject=Where2Tattoo%20Artist%20Waitlist">Artist waitlist</a>
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme" title="Toggle theme">🌙</button>
+</nav>
   </header>
 
   <main class="hero">
@@ -144,6 +189,28 @@
   const GIFT_URL = "https://YOUR-GIFT-LINK.example.com";
 
   // ——— Basic UI wiring ———
+ (function(){
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    const saved = localStorage.getItem('w2t-theme');
+    const theme = saved || (prefersLight ? 'light' : 'dark');
+    setTheme(theme);
+
+    const btn = document.getElementById('themeToggle');
+    btn.addEventListener('click', ()=>{
+      const next = (document.documentElement.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+      setTheme(next);
+      localStorage.setItem('w2t-theme', next);
+    });
+
+    function setTheme(t){
+      document.documentElement.setAttribute('data-theme', t);
+      const isLight = t === 'light';
+      btn.textContent = isLight ? '☀️' : '🌙';
+      btn.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+    }
+  })();
+
+  
   document.getElementById("year").textContent = new Date().getFullYear();
   if (SHOW_NAME) document.getElementById("nameSlot").textContent = ", " + SHOW_NAME;
   document.getElementById("giftLink").setAttribute("href", GIFT_URL);

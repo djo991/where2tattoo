@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Where2Tattoo — The shortest distance between you and your perfect tattoo.</title>
 <meta name="description" content="Where2Tattoo connects customers with the right tattoo artist and studio.">
-<meta property="og:title" content="Where2Tattoo — The shortest distabatklaudija@gmail.comance between you and your perfect tattoo.">
+<meta property="og:title" content="Where2Tattoo — The shortest distance between you and your perfect tattoo.">
 <meta property="og:description" content="A tiny birthday quest… and the start of something big.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://dummyimage.com/1200x630/111/fff&text=Where2Tattoo">
@@ -61,8 +61,8 @@
   .reveal{display:none;margin-top:16px}
   .success{color:var(--ok);font-weight:700}
   .hint{color:var(--warn)}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
-  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  /* stacked feature cards so they’re not squished */
+  .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:24px}
   footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
   .needle{border-bottom:1px dotted var(--line);cursor:help}
   /* subtle confetti */
@@ -91,12 +91,13 @@
     <section class="card">
       <h1>Happy Birthday<span id="nameSlot"></span>! 🎉</h1>
       <p class="sub">
-        You followed the clues, dodged red herrings, and outsmarted three <span class="needle" title="Needle #1">decoy</span> domains.
-        This is the last door. Pick the lock with the three-letter word that powers every tattoo.
+        We left these breadcrumbs because we believe in the thing you’ll build.  
+        You’ve followed the trail, read the signs, and found the door.  
+        Speak the three-letter word every artist needs, and step into the workshop.
       </p>
 
       <div class="puzzle">
-        <input id="code" maxlength="8" placeholder="Enter code (_ _ _)" aria-label="Puzzle code">
+        <input id="code" maxlength="8" placeholder="Enter code ( _ _ _ )" aria-label="Puzzle code">
         <button class="button" id="unlock">Unlock</button>
         <button class="button ghost" id="hintBtn">Need a hint?</button>
       </div>
@@ -105,11 +106,12 @@
       <div class="reveal" id="reveal">
         <p class="success">✔ Unlocked!</p>
         <p>
-          You’ve proven you can navigate chaos with style. Now take the next step:
-          turn this into the marketplace artists and clients deserve. We’ve sketched the seed—bring the vision and ship the thing.
+          You’ve come this far using your wits—now use them to make this real. Start small: one city, ten artists, a waitlist.
+          Talk to people before pixels. Ship weekly. Keep the <span class="needle" title="Needle #2">linework</span> clean and shade as you go.
+          We believe in you. This is your canvas.
         </p>
         <div class="puzzle">
-          <a class="button" href="https://YOUR-GIFT-LINK.example.com" target="_blank" rel="noopener">Claim your gift</a>
+          <a class="button" id="giftLink" href="#" target="_blank" rel="noopener">Claim your gift</a>
           <a class="button ghost" href="mailto:abatklaudija@gmail.com?subject=Where2Tattoo%20Kickoff&body=Let%E2%80%99s%20ship%20it.">Let’s ship it</a>
         </div>
       </div>
@@ -125,7 +127,7 @@
       <div class="grid">
         <div class="card"><b>Match smarter</b><br><span class="muted">Style tags, healed-work ratings, and real waitlists.</span></div>
         <div class="card"><b>Trust by design</b><br><span class="muted">Verified portfolios, deposits, simple reschedules.</span></div>
-        <div class="card"><b>Local first</b><br><span class="muted">City-level discovery with travel artist drops.</span></div>
+        <div class="card"><b>Local first</b><br><span class="muted">City-level discovery with travel-artist drops.</span></div>
       </div>
     </aside>
   </main>
@@ -133,12 +135,8 @@
   <section class="card" style="margin-top:24px">
     <h3 style="margin-top:0">A note from your co-conspirators</h3>
     <p>
-      You’ve come this far using your wits—now use them to make this real. Start tiny: one city, ten artists, a waitlist.
-      Talk to customers before a single pixel moves. Ship weekly. Keep the <span class="needle" title="Needle #2">linework</span> clean and iterate the shading later.
-    </p>
-    <p>
-      When in doubt, ask what reduces friction for artists and what increases confidence for clients. Do that twice. Then do it again.
-      We believe in you. (Also, we bought two domains. No pressure.)
+      When in doubt, ask what removes friction for artists and what builds confidence for clients. Do that twice. Then do it again.
+      We’re proud of you—and yes, we bought two domains. Consider it a nudge.
     </p>
   </section>
 
@@ -151,12 +149,14 @@
 <script>
   // ——— Settings you can tweak ———
   const SECRET_CODE = "INK";                 // puzzle answer (uppercase)
-  const SHOW_NAME = "Marko";                      // put your brother's name or leave empty
+  const SHOW_NAME = "Marko";                 // put your brother's name or leave empty
   const GIFT_URL = "https://YOUR-GIFT-LINK.example.com";
 
   // ——— Basic UI wiring ———
   document.getElementById("year").textContent = new Date().getFullYear();
   if (SHOW_NAME) document.getElementById("nameSlot").textContent = ", " + SHOW_NAME;
+  // set gift link from single source of truth
+  document.getElementById("giftLink").setAttribute("href", GIFT_URL);
 
   const input = document.getElementById("code");
   const btn = document.getElementById("unlock");

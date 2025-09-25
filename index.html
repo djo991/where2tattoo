@@ -1,18 +1,227 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Where2Tattoo — Find the right studio fast</title>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Where2Tattoo — The shortest distance between you and your perfect tattoo.</title>
+<meta name="description" content="Where2Tattoo connects customers with the right tattoo artist and studio.">
+<meta property="og:title" content="Where2Tattoo — The shortest distance between you and your perfect tattoo.">
+<meta property="og:description" content="A tiny birthday quest… and the start of something big.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://dummyimage.com/1200x630/111/fff&text=Where2Tattoo">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  body{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;margin:0;background:#0f0f12;color:#eee}
-  .wrap{max-width:820px;margin:0 auto;padding:64px 20px}
-  h1{font-size:2.4rem;margin:.2em 0}
-  p{opacity:.9}
-  a.button{display:inline-block;margin-top:16px;padding:12px 18px;border:1px solid #555;border-radius:10px;color:#eee;text-decoration:none}
+  :root{
+    --bg:#0f0f12; --fg:#eaeaf0; --muted:#b9b9c6; --accent:#7cf7d4; --ink:#9b8cff;
+    --card:#15161b; --line:#23242b; --ok:#58d69c; --warn:#ffd085;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+    color:var(--fg); background:
+      radial-gradient(1200px 800px at 10% -10%, #1a1b22 0%, transparent 60%),
+      radial-gradient(1000px 700px at 90% 0%, #161722 0%, transparent 60%),
+      var(--bg);
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:56px 20px 96px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .logo{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--fg)}
+  .logo-badge{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--ink),var(--accent));display:grid;place-items:center;font-weight:800}
+  .logo-text{font-weight:800;letter-spacing:.2px}
+  .motto{margin:18px 0 0;color:var(--muted);font-size:.95rem}
+  .cta-minis a{color:var(--muted);text-decoration:none;font-size:.95rem;margin-left:16px;border-bottom:1px dashed var(--line)}
+  main{margin-top:40px}
+  .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
+  @media (max-width:900px){ .hero{grid-template-columns:1fr} }
+  h1{font-size:clamp(1.9rem,3.5vw,2.8rem);line-height:1.08;margin:.2em 0}
+  .sub{color:var(--muted);font-size:1.05rem}
+  .card{
+    background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));
+    border:1px solid var(--line); border-radius:16px; padding:22px 18px;
+  }
+  .bullets{display:grid;gap:10px;margin:12px 0 4px}
+  .bullets b{color:var(--fg)}
+  .button{
+    appearance:none;background:linear-gradient(135deg,var(--ink),var(--accent));
+    color:#111;border:none;padding:12px 16px;border-radius:12px;font-weight:700;
+    text-decoration:none;display:inline-flex;align-items:center;gap:10px;
+    box-shadow:0 10px 30px rgba(124,247,212,.15);cursor:pointer
+  }
+  .button.ghost{
+    background:transparent;color:var(--fg);border:1px solid var(--line);
+    box-shadow:none
+  }
+  .puzzle{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+  .puzzle input{
+    background:#0c0d11;border:1px solid var(--line);color:var(--fg);
+    padding:12px 14px;border-radius:12px;min-width:220px;letter-spacing:.2em;text-transform:uppercase
+  }
+  .msg{margin-top:12px;color:var(--muted)}
+  .reveal{display:none;margin-top:16px}
+  .success{color:var(--ok);font-weight:700}
+  .hint{color:var(--warn)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+  .needle{border-bottom:1px dotted var(--line);cursor:help}
+  /* subtle confetti */
+  canvas#confetti{position:fixed;inset:0;pointer-events:none;opacity:.9}
 </style>
+</head>
+<body>
+<canvas id="confetti" width="0" height="0" aria-hidden="true"></canvas>
 <div class="wrap">
-  <h1>Where2Tattoo</h1>
-  <p>One page. The right studio. Coming very soon.</p>
-  <a class="button" href="mailto:you@example.com?subject=Where2Tattoo">Get in touch</a>
+
+  <header>
+    <a class="logo" href="#">
+      <div class="logo-badge">W2</div>
+      <div>
+        <div class="logo-text">Where2Tattoo</div>
+        <div class="motto">The shortest distance between you and your perfect tattoo.</div>
+      </div>
+    </a>
+    <nav class="cta-minis">
+      <a href="mailto:YOUREMAIL@example.com?subject=Where2Tattoo">Email</a>
+      <a href="mailto:YOUREMAIL@example.com?subject=Where2Tattoo%20Artist%20Waitlist">Artist waitlist</a>
+    </nav>
+  </header>
+
+  <main class="hero">
+    <section class="card">
+      <h1>Happy Birthday<span id="nameSlot"></span>! 🎉</h1>
+      <p class="sub">
+        You followed the clues, dodged red herrings, and outsmarted three <span class="needle" title="Needle #1">decoy</span> domains.
+        This is the last door. Pick the lock with the three-letter word that powers every tattoo.
+      </p>
+
+      <div class="puzzle">
+        <input id="code" maxlength="8" placeholder="Enter code (hint: _ _ _)" aria-label="Puzzle code">
+        <button class="button" id="unlock">Unlock</button>
+        <button class="button ghost" id="hintBtn">Need a hint?</button>
+      </div>
+      <div class="msg" id="msg" role="status">Type the code and press Unlock. (Pro tip: try the <span class="needle" title="↑ ↑ ↓ ↓ ← → ← → B A">old gamer move</span>.)</div>
+
+      <div class="reveal" id="reveal">
+        <p class="success">✔ Unlocked!</p>
+        <p>
+          You’ve proven you can navigate chaos with style. Now take the next step:
+          turn this into the marketplace artists and clients deserve. We’ve sketched the seed—bring the vision and ship the thing.
+        </p>
+        <div class="puzzle">
+          <a class="button" href="https://YOUR-GIFT-LINK.example.com" target="_blank" rel="noopener">Claim your gift</a>
+          <a class="button ghost" href="mailto:YOUREMAIL@example.com?subject=Where2Tattoo%20Kickoff&body=Let%E2%80%99s%20ship%20it.">Let’s ship it</a>
+        </div>
+      </div>
+    </section>
+
+    <aside class="card">
+      <h3 style="margin-top:0">What is Where2Tattoo?</h3>
+      <div class="bullets">
+        <div><b>For customers:</b> tell us the style, budget, and timing—get matched to the right artist, not just the nearest one.</div>
+        <div><b>For artists:</b> a steady stream of briefs with reference boards and intent—no more cold DMs.</div>
+        <div><b>For studios:</b> calendar fills + deposit handling + aftercare nudges that bring people back.</div>
+      </div>
+      <div class="grid">
+        <div class="card"><b>Match smarter</b><br><span class="muted">Style tags, healed-work ratings, and real waitlists.</span></div>
+        <div class="card"><b>Trust by design</b><br><span class="muted">Verified portfolios, deposits, simple reschedules.</span></div>
+        <div class="card"><b>Local first</b><br><span class="muted">City-level discovery with travel artist drops.</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">A note from your co-conspirators</h3>
+    <p>
+      You’ve come this far using your wits—now use them to make this real. Start tiny: one city, ten artists, a waitlist.
+      Talk to customers before a single pixel moves. Ship weekly. Keep the <span class="needle" title="Needle #2">linework</span> clean and iterate the shading later.
+    </p>
+    <p>
+      When in doubt, ask what reduces friction for artists and what increases confidence for clients. Do that twice. Then do it again.
+      We believe in you. (Also, we bought two domains. No pressure.)
+    </p>
+  </section>
+
+  <footer>
+    © <span id="year"></span> Where2Tattoo • Built with love and <span class="needle" title="Needle #3">ink</span>.  
+    <span style="opacity:.6">P.S. If the page explodes in confetti, you found the secret handshake.</span>
+  </footer>
 </div>
+
+<script>
+  // ——— Settings you can tweak ———
+  const SECRET_CODE = "INK";                 // puzzle answer (uppercase)
+  const SHOW_NAME = "Marko";                      // put your brother's name or leave empty
+  const GIFT_URL = "https://YOUR-GIFT-LINK.example.com";
+
+  // ——— Basic UI wiring ———
+  document.getElementById("year").textContent = new Date().getFullYear();
+  if (SHOW_NAME) document.getElementById("nameSlot").textContent = ", " + SHOW_NAME;
+
+  const input = document.getElementById("code");
+  const btn = document.getElementById("unlock");
+  const msg = document.getElementById("msg");
+  const reveal = document.getElementById("reveal");
+  const hintBtn = document.getElementById("hintBtn");
+
+  function unlock() {
+    const val = (input.value || "").trim().toUpperCase();
+    if (!val) { msg.textContent = "Try a three-letter word artists can’t work without."; return; }
+    if (val === SECRET_CODE) {
+      reveal.style.display = "block";
+      msg.innerHTML = '<span class="success">Nice.</span> Welcome inside.';
+      celebrate();
+    } else {
+      msg.innerHTML = 'Not quite. Think fluid. Think permanent. Think <span class="needle" title="It rhymes with *pink*">color carrier</span>.';
+    }
+  }
+  btn.addEventListener("click", unlock);
+  input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") unlock(); });
+  hintBtn.addEventListener("click", ()=>{ msg.innerHTML = '<span class="hint">Hint:</span> It goes in the machine, not the power supply.' });
+
+  // ——— Konami code → confetti ———
+  const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+  let buffer = [];
+  window.addEventListener("keydown", e=>{
+    buffer.push(e.key); if (buffer.length>KONAMI.length) buffer.shift();
+    if (KONAMI.every((k,i)=>buffer[i].toLowerCase()===k.toLowerCase())) celebrate();
+  });
+
+  // ——— Tiny confetti (canvas, ~1.5KB) ———
+  const cvs = document.getElementById("confetti"), ctx = cvs.getContext("2d");
+  let bits=[], rafId=null;
+  function resize(){ cvs.width = innerWidth; cvs.height = innerHeight; }
+  addEventListener("resize", resize); resize();
+
+  function celebrate() {
+    const n = 160;
+    for (let i=0;i<n;i++){
+      bits.push({
+        x: Math.random()*cvs.width,
+        y: -20 - Math.random()*cvs.height*.3,
+        r: 4+Math.random()*4,
+        vx: -2+Math.random()*4,
+        vy: 2+Math.random()*3,
+        a: Math.random()*Math.PI*2,
+        va: -0.1+Math.random()*0.2
+      });
+    }
+    if (!rafId) tick();
+    setTimeout(()=>{ bits=[]; cancelAnimationFrame(rafId); rafId=null; ctx.clearRect(0,0,cvs.width,cvs.height); }, 2600);
+  }
+  function tick(){
+    rafId = requestAnimationFrame(tick);
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    bits.forEach(b=>{
+      b.x+=b.vx; b.y+=b.vy; b.a+=b.va; b.vy+=0.03;
+      ctx.save();
+      ctx.translate(b.x,b.y); ctx.rotate(b.a);
+      ctx.fillStyle = Math.random()<.5 ? "#7cf7d4" : "#9b8cff";
+      ctx.fillRect(-b.r/2,-b.r/2,b.r,b.r);
+      ctx.restore();
+    });
+    bits = bits.filter(b=>b.y < cvs.height+20);
+  }
+</script>
+</body>
 </html>

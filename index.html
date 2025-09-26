@@ -221,19 +221,48 @@ body{
 
 /* on-screen d-pad (always grid; never switches to flex) */
 /* D-pad visibility: hide by default, show on touch devices */
-#gameDpad{ display:none; }  /* override the base rule */
+#gameDpad{
+  /* hidden by default; media query below will flip it on */
+  display: none;
 
-@media (pointer: coarse), (hover: none) {
-  #gameDpad{ display:grid; }
+  /* put it above the canvas and place it bottom-right */
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 3; /* > canvas, < close button (z=4) */
+  pointer-events: none; /* let clicks pass except on buttons */
+
+  /* grid layout */
+  --pad: clamp(40px, 10vw, 56px);
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  grid-template-columns: repeat(3, var(--pad));
+  grid-template-rows: repeat(3, var(--pad));
+  gap: 10px;
 }
+
 #gameDpad button{
-  width:48px; height:48px; border-radius:12px;
-  border:1px solid color-mix(in oklab,var(--fg) 16%,transparent);
-  background:color-mix(in oklab,var(--fg) 6%,transparent);
-  color:var(--fg); font-weight:700;
-  pointer-events:auto;
+  width: var(--pad);
+  height: var(--pad);
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab,var(--fg) 16%,transparent);
+  background: color-mix(in oklab,var(--fg) 6%,transparent);
+  color: var(--fg); font-weight: 700;
+  pointer-events: auto; /* clickable */
 }
-#gameDpad .up{grid-area:up;} .left{grid-area:left;} .right{grid-area:right;} .down{grid-area:down;}
+
+/* show D-pad on touch devices only */
+@media (pointer: coarse), (hover: none){
+  #gameDpad{ display: grid; }
+}
+
+/* already present, keep */
+#gameDpad .up{grid-area:up;}
+#gameDpad .left{grid-area:left;}
+#gameDpad .right{grid-area:right;}
+#gameDpad .down{grid-area:down;}
 
 </style>
 </head>

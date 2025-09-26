@@ -128,40 +128,62 @@ body{
   outline-offset: 2px;
   border-radius: 10px;
 }
-  /* ===== PANZER MINI-GAME ===== */
-  #gameOverlay{position:fixed;inset:0;z-index:9999;display:grid !important;place-items:center;
-  background:color-mix(in oklab,var(--bg) 55%,transparent);backdrop-filter:blur(2px);}
-#gameWrap{position:relative;width:min(980px,92vw);height:min(70vh,620px);
-  background:var(--bg-soft);border:1px solid color-mix(in oklab,var(--fg) 10%,transparent);
-  border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
-#gameHud{position:absolute;left:12px; right:64px; top:10px;right:12px;display:flex;justify-content:space-between;gap:8px;z-index:2}
-#gameHud .pill{background:color-mix(in oklab,var(--fg) 6%,transparent);border:1px solid color-mix(in oklab,var(--fg) 14%,transparent);
-  padding:6px 10px;border-radius:999px;font-weight:600}
-#gameCanvas{position:absolute;inset:0;width:100%;height:100%}
-#gameDpad{
-  position:absolute; left:50%; bottom:12px; transform:translateX(-50%);
-  display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(3,48px);
-  gap:8px; z-index:2;
+ /* ===== PANZER MINI-GAME ===== */
+#gameOverlay{
+  position:fixed; inset:0; z-index:9999;
+  display:grid !important; place-items:center;
+  background:color-mix(in oklab,var(--bg) 55%,transparent); backdrop-filter:blur(2px);
 }
-#gameDpad .up   { grid-column:2; grid-row:1; }
-#gameDpad .left { grid-column:1; grid-row:2; }
-#gameDpad .right{ grid-column:3; grid-row:2; }
-#gameDpad .down { grid-column:2; grid-row:3; }
+#gameWrap{
+  position:relative; width:min(980px,92vw); height:min(70vh,620px);
+  background:var(--bg-soft);
+  border:1px solid color-mix(in oklab,var(--fg) 10%,transparent);
+  border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  overflow:hidden;
+}
+#gameCanvas{ position:absolute; inset:0; width:100%; height:100% }
+
+#gameHud{
+  position:absolute; top:10px; left:12px; right:88px;  /* leave gutter for ✕ */
+  display:flex; gap:8px; align-items:center; z-index:3;
+}
+#gameHud .pill{
+  background:color-mix(in oklab,var(--fg) 6%,transparent);
+  border:1px solid color-mix(in oklab,var(--fg) 14%,transparent);
+  padding:6px 10px; border-radius:999px; font-weight:600;
+  display:inline-flex; align-items:center; gap:8px;
+}
+
+/* top-right close button */
+#closeGame{
+  position:absolute; top:8px; right:8px; width:40px; height:40px;
+  border-radius:10px;
+  border:1px solid color-mix(in oklab,var(--fg) 12%,transparent);
+  background:var(--bg); color:var(--fg); font-weight:800; z-index:4; cursor:pointer;
+}
+#closeGame:hover{ background:color-mix(in oklab,var(--fg) 6%,var(--bg)) }
+
+/* on-screen d-pad (always grid; never switches to flex) */
+#gameDpad{
+  position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
+  display:grid; gap:8px; z-index:3;
+  grid-template-columns:repeat(3,48px); grid-template-rows:repeat(3,48px);
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  /* don’t block the game canvas; only buttons receive clicks */
+  pointer-events:none;
+}
 #gameDpad button{
   width:48px; height:48px; border-radius:12px;
   border:1px solid color-mix(in oklab,var(--fg) 16%,transparent);
   background:color-mix(in oklab,var(--fg) 6%,transparent);
   color:var(--fg); font-weight:700;
+  pointer-events:auto;
 }
+#gameDpad .up{grid-area:up;} .left{grid-area:left;} .right{grid-area:right;} .down{grid-area:down;}
 
-  /* keep the overlay centered */
-
-/* top-right close button */
-#closeGame{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:10px;
-  border:1px solid color-mix(in oklab,var(--fg) 12%,transparent);
-  background:var(--bg);color:var(--fg);font-weight:800;z-index:4;cursor:pointer}
-#closeGame:hover{background:color-mix(in oklab,var(--fg) 6%,var(--bg))}
-@media (max-width:700px){ #gameDpad{ display:flex } }
 </style>
 </head>
 <body>
@@ -581,82 +603,67 @@ body{
   tick();
 }
 
-  // ===================== PANZER MINI-GAME =====================
-  
+// ===================== PANZER MINI-GAME =====================
 (function(){
   const REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Create overlay on demand
-  let overlay, wrap, hud, cvs, ctx, dpad;
+  let overlay, wrap, cvs, ctx, dpad;
+
   function palette(){
-  const light = document.documentElement.getAttribute('data-theme') === 'light';
-  return light ? {
-    asphalt:    '#e9edf5',
-    asphaltAlt: '#f5f7fb',
-    lane:       '#b8c1d0',
-    safe:       '#ffffff',
-    finish:     '#b0c0d4',
-    carA:       '#2b59ff',   // blue
-    carB:       '#00b8a9',   // teal
-    outline:    '#2a2f36',
-    tankHull:   '#2b59ff',
-    tankTurret: '#00b8a9',
-    highlight:  'rgba(0,184,169,.18)'
-  } : {
-    asphalt:    '#141922',
-    asphaltAlt: '#1a2030',
-    lane:       '#65708a',
-    safe:       '#0e131a',
-    finish:     '#8aa0bf',
-    carA:       '#7cf7d4',   // accent
-    carB:       '#9b8cff',   // ink
-    outline:    '#000000',
-    tankHull:   '#7cf7d4',
-    tankTurret: '#9b8cff',
-    highlight:  'rgba(124,247,212,.16)'
-  };
-}
+    const light = document.documentElement.getAttribute('data-theme') === 'light';
+    return light ? {
+      asphalt:'#e9edf5', asphaltAlt:'#f5f7fb', lane:'#b8c1d0', safe:'#ffffff', finish:'#b0c0d4',
+      carA:'#2b59ff', carB:'#00b8a9', outline:'#2a2f36', tankHull:'#2b59ff', tankTurret:'#00b8a9',
+      highlight:'rgba(0,184,169,.18)'
+    } : {
+      asphalt:'#141922', asphaltAlt:'#1a2030', lane:'#65708a', safe:'#0e131a', finish:'#8aa0bf',
+      carA:'#7cf7d4', carB:'#9b8cff', outline:'#000000', tankHull:'#7cf7d4', tankTurret:'#9b8cff',
+      highlight:'rgba(124,247,212,.16)'
+    };
+  }
 
-  
   function ensureOverlay(){
-  if (overlay) return;
-  overlay = document.createElement('div'); overlay.id = 'gameOverlay';
-  overlay.innerHTML = `
-    <div id="gameWrap">
-      <button id="closeGame" aria-label="Close game">✕</button>
-      <div id="gameHud">
-        <div class="pill">⏱ <span id="hudTime">0.0</span>s • ❤️ <span id="hudLives">3</span></div>
-        <div class="pill"><button class="btn" id="btnRestart">⟳ Restart</button></div>
-      </div>
-      <canvas id="gameCanvas"></canvas>
-      <div id="gameDpad" aria-hidden="false">
-  <button class="up"    data-dx="0"  data-dy="-1">↑</button>
-  <button class="left"  data-dx="-1" data-dy="0">←</button>
-  <button class="right" data-dx="1"  data-dy="0">→</button>
-  <button class="down"  data-dx="0"  data-dy="1">↓</button>
-</div>
+    if (overlay) return;
+    overlay = document.createElement('div'); overlay.id = 'gameOverlay';
+    overlay.innerHTML = `
+      <div id="gameWrap">
+        <button id="closeGame" aria-label="Close game">✕</button>
+        <div id="gameHud">
+          <div class="pill">⏱ <span id="hudTime">0.0</span>s • ❤️ <span id="hudLives">3</span></div>
+          <button class="pill" id="btnRestart">⟳ Restart</button>
+        </div>
+        <canvas id="gameCanvas"></canvas>
 
-    </div>`;
-  document.body.appendChild(overlay);
-  wrap = overlay.querySelector('#gameWrap');
-  hud  = overlay.querySelector('#gameHud');
-  cvs  = overlay.querySelector('#gameCanvas');
-  ctx  = cvs.getContext('2d', { alpha:false });
-  dpad = overlay.querySelector('#gameDpad');
+        <div id="gameDpad" aria-hidden="false">
+          <button class="up"    data-dx="0"  data-dy="-1">↑</button>
+          <button class="left"  data-dx="-1" data-dy="0">←</button>
+          <button class="right" data-dx="1"  data-dy="0">→</button>
+          <button class="down"  data-dx="0"  data-dy="1">↓</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
 
-  overlay.querySelector('#closeGame').addEventListener('click', stopPanzer);
-  overlay.querySelector('#btnRestart').addEventListener('click', resetGame);
-  dpad.querySelectorAll('button').forEach(b=>{
-    b.addEventListener('click', ()=> movePlayer(parseInt(b.dataset.dx,10), parseInt(b.dataset.dy,10)));
-  });
-  window.addEventListener('resize', resizeCanvas);
-}
+    wrap = overlay.querySelector('#gameWrap');
+    cvs  = overlay.querySelector('#gameCanvas');
+    ctx  = cvs.getContext('2d', { alpha:false });
+    dpad = overlay.querySelector('#gameDpad');
 
+    overlay.querySelector('#closeGame').addEventListener('click', stopPanzer);
+    overlay.querySelector('#btnRestart').addEventListener('click', resetGame);
+
+    // touch/click D-pad
+    dpad.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', ()=> movePlayer(parseInt(b.dataset.dx,10), parseInt(b.dataset.dy,10)));
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+  }
 
   // Public launcher
   window.startPanzer = function startPanzer(){
     ensureOverlay();
-    overlay.style.display = 'grid';
+    overlay.style.display = 'grid';    // keep centered
     begin();
   };
 
@@ -672,36 +679,35 @@ body{
   const CELL = 48;                // base size (will scale)
   let W=COLS*CELL, H=ROWS*CELL, scale=1;
 
-  // Player
-  const START_POS = {x: Math.floor(COLS/2), y: ROWS-1};
+  // Player position
+  const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 }; // bottom row
   let px, py, lives, t0, timeNow, running=false;
 
-  // Lanes (y from bottom to top, road on rows 2..10)
-  const lanes = []; // each: { y, dir, speed, density, color }
+  // Lanes (rows 2..9 are road)
+  const lanes = []; // each: { y, dir, speed, density, cars[] }
   function buildLanes(){
-  lanes.length = 0;
-  const specs = [
-    {row:9, dir: 1, speed: 2.8, density: 0.22},
-    {row:8, dir:-1, speed: 3.6, density: 0.25},
-    {row:7, dir: 1, speed: 2.2, density: 0.20},
-    {row:6, dir:-1, speed: 4.0, density: 0.28},
-    {row:5, dir: 1, speed: 3.2, density: 0.22},
-    {row:4, dir:-1, speed: 2.6, density: 0.20},
-    {row:3, dir: 1, speed: 3.8, density: 0.28},
-    {row:2, dir:-1, speed: 2.4, density: 0.22},
-  ];
-  specs.forEach(s => lanes.push({ y:s.row, dir:s.dir, speed:s.speed, density:s.density, cars:[] }));
-}
+    lanes.length = 0;
+    const specs = [
+      {row:9, dir: 1, speed: 2.8, density: 0.22},
+      {row:8, dir:-1, speed: 3.6, density: 0.25},
+      {row:7, dir: 1, speed: 2.2, density: 0.20},
+      {row:6, dir:-1, speed: 4.0, density: 0.28},
+      {row:5, dir: 1, speed: 3.2, density: 0.22},
+      {row:4, dir:-1, speed: 2.6, density: 0.20},
+      {row:3, dir: 1, speed: 3.8, density: 0.28},
+      {row:2, dir:-1, speed: 2.4, density: 0.22},
+    ];
+    specs.forEach(s => lanes.push({ y:s.row, dir:s.dir, speed:s.speed, density:s.density, cars:[] }));
+  }
 
-
-  // Obstacles (cars) per lane
+  // Obstacles
   function spawnCars(){
     lanes.forEach(l=>{
       l.cars.length = 0;
-      const span = COLS + 6; // wider spawn space offscreen
+      const span = COLS + 6;
       const count = Math.max(2, Math.floor(span * l.density));
       for (let i=0;i<count;i++){
-        const w = 1.5 + Math.random()*1.3;  // width in cells
+        const w = 1.5 + Math.random()*1.3;  // in cells
         const x = (Math.random()*span - 3) * CELL;
         l.cars.push({ x, w: w*CELL });
       }
@@ -715,98 +721,8 @@ body{
     scale = Math.min(W/(COLS*CELL), H/(ROWS*CELL));
     cvs.width = W; cvs.height = H;
   }
-
-  function drawRoad(){
-  const p = palette();
-
-  // goal (top 2 rows) + start (bottom 2 rows)
-  ctx.fillStyle = p.safe;
-  rect(0, rowY(0),   W, rowH(2));
-  rect(0, rowY(ROWS-2), W, rowH(2));
-
-  // asphalt in the middle
-  ctx.fillStyle = p.asphalt;
-  rect(0, rowY(2), W, rowH(ROWS-4));
-
-  // alternating bands for lanes
-  for (let r=2; r<ROWS-2; r++){
-    if (r % 2 === 1){
-      ctx.fillStyle = p.asphaltAlt;
-      rect(0, rowY(r), W, rowH(1));
-    }
-  }
-
-  // dashed lane markers
-  ctx.strokeStyle = p.lane;
-  ctx.setLineDash([12,12]);
-  ctx.lineWidth = 2;
-  for (let r=2; r<ROWS-2; r++){
-    const y = rowY(r) + rowH(1)/2;
-    line(0, y, W, y);
-  }
-  ctx.setLineDash([]);
-
-  // finish stripe at top edge of goal zone
-  ctx.fillStyle = p.finish;
-  rect(0, rowY(2)-rowH(.15), W, rowH(.15));
-}
-
-
-  function drawTank(x, y){
-  const p = palette();
-  const s = CELL*scale;
-  const gx = colX(x), gy = rowY(y);
-
-  // highlight tile so start is obvious
-  ctx.fillStyle = p.highlight;
-  roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, true);
-  ctx.strokeStyle = 'rgba(255,255,255,.6)';
-  ctx.lineWidth = 1.5;
-  roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, false);
-
-  // tracks
-  ctx.fillStyle = 'rgba(0,0,0,.7)';
-  roundRect(gx + s*0.10, gy + s*0.18, s*0.80, s*0.14, 6, true);
-  roundRect(gx + s*0.10, gy + s*0.68, s*0.80, s*0.14, 6, true);
-
-  // hull
-  ctx.fillStyle = p.tankHull;
-  roundRect(gx + s*0.18, gy + s*0.30, s*0.64, s*0.40, 8, true);
-
-  // turret + barrel
-  ctx.fillStyle = p.tankTurret;
-  roundRect(gx + s*0.40, gy + s*0.38, s*0.26, s*0.24, 6, true);
-  ctx.fillRect(gx + s*0.66, gy + s*0.46, s*0.32, s*0.08); // barrel
-}
-
-
-
-  function drawCar(lane, car){
-  const p = palette();
-  const y = lane.y;
-  const gx = car.x;
-  const gy = rowY(y) + CELL*scale*0.12;
-  const h = CELL*scale*0.76;
-
-  // body with subtle glow
-  ctx.save();
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = 'rgba(255,255,255,.25)';
-  ctx.fillStyle = lane.dir > 0 ? p.carA : p.carB;
-  roundRect(gx, gy, car.w, h, 10, true);
-  ctx.restore();
-
-  // outline
-  ctx.strokeStyle = p.outline;
-  ctx.lineWidth = 2;
-  roundRect(gx, gy, car.w, h, 10, false);
-}
-
-
-
-  // ===== Math helpers =====
   function colX(c){ return c * CELL * scale; }
-  function rowY(r){ return r * CELL * scale; }    // row 1 bottom
+  function rowY(r){ return r * CELL * scale; }  // row 0 = top
   function rowH(n){ return n * CELL * scale; }
   function rect(x,y,w,h){ ctx.fillRect(x,y,w,h); }
   function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
@@ -816,8 +732,89 @@ body{
     ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
     if (fill) ctx.fill(); else ctx.stroke();
   }
-  function colorMix(hex, alpha){ // hex on top of theme bg
-    return `color-mix(in oklab, ${hex} ${alpha*100}%, var(--bg))`;
+  function colorMix(hex, alpha){ return `color-mix(in oklab, ${hex} ${alpha*100}%, var(--bg))`; }
+  function clamp(v, min, max){ return v < min ? min : (v > max ? max : v); }
+  function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  function drawRoad(){
+    const p = palette();
+    // goal (top 2 rows) + start (bottom 2 rows)
+    ctx.fillStyle = p.safe;
+    rect(0, rowY(0), W, rowH(2));
+    rect(0, rowY(ROWS-2), W, rowH(2));
+
+    // asphalt middle (rows 2..9)
+    ctx.fillStyle = p.asphalt;
+    rect(0, rowY(2), W, rowH(ROWS-4));
+
+    // alternating bands
+    for (let r=2; r<ROWS-2; r++){
+      if (r % 2 === 1){
+        ctx.fillStyle = p.asphaltAlt;
+        rect(0, rowY(r), W, rowH(1));
+      }
+    }
+
+    // dashed lane markers
+    ctx.strokeStyle = p.lane;
+    ctx.setLineDash([12,12]);
+    ctx.lineWidth = 2;
+    for (let r=2; r<ROWS-2; r++){
+      const y = rowY(r) + rowH(1)/2;
+      line(0, y, W, y);
+    }
+    ctx.setLineDash([]);
+
+    // finish stripe at top edge of goal zone
+    ctx.fillStyle = p.finish;
+    rect(0, rowY(2)-rowH(.15), W, rowH(.15));
+  }
+
+  function drawTank(x, y){
+    const p = palette();
+    const s = CELL*scale;
+    const gx = colX(x), gy = rowY(y);
+
+    // highlight tile
+    ctx.fillStyle = p.highlight;
+    roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, true);
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 1.5;
+    roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, false);
+
+    // tracks
+    ctx.fillStyle = 'rgba(0,0,0,.7)';
+    roundRect(gx + s*0.10, gy + s*0.18, s*0.80, s*0.14, 6, true);
+    roundRect(gx + s*0.10, gy + s*0.68, s*0.80, s*0.14, 6, true);
+
+    // hull
+    ctx.fillStyle = p.tankHull;
+    roundRect(gx + s*0.18, gy + s*0.30, s*0.64, s*0.40, 8, true);
+
+    // turret + barrel
+    ctx.fillStyle = p.tankTurret;
+    roundRect(gx + s*0.40, gy + s*0.38, s*0.26, s*0.24, 6, true);
+    ctx.fillRect(gx + s*0.66, gy + s*0.46, s*0.32, s*0.08);
+  }
+
+  function drawCar(lane, car){
+    const p = palette();
+    const gx = car.x;
+    const gy = rowY(lane.y) + CELL*scale*0.12;
+    const h = CELL*scale*0.76;
+
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(255,255,255,.25)';
+    ctx.fillStyle = lane.dir > 0 ? p.carA : p.carB;
+    roundRect(gx, gy, car.w, h, 10, true);
+    ctx.restore();
+
+    ctx.strokeStyle = p.outline;
+    ctx.lineWidth = 2;
+    roundRect(gx, gy, car.w, h, 10, false);
   }
 
   // ===== Input & SFX =====
@@ -825,26 +822,20 @@ body{
     if (!running) return;
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault();
     if (e.key==='Escape'){ stopPanzer(); return; }
-    const map = {ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0], w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], W:[0,-1], S:[0,1], A:[-1,0], D:[1,0]};
+    const map = {ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0],
+                 w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], W:[0,-1], S:[0,1], A:[-1,0], D:[1,0]};
     if (map[e.key]) movePlayer(map[e.key][0], map[e.key][1]);
   }
   function movePlayer(dx, dy){
-  px = clamp(px + dx, 0, COLS-1);
-  py = clamp(py + dy, 0, ROWS-1);
-  if (py <= 1) { gameOver(true); }   // reached the goal zone at the top
-}
+    px = clamp(px + dx, 0, COLS-1);
+    py = clamp(py + dy, 0, ROWS-1);
+    if (py <= 1) { gameOver(true); } // reached top safe zone
+  }
 
-
-  // Simple SFX (reuses your audioCtx if enabled)
   function sfx(kind){
     if (!audioCtx || REDUCE_MOTION) return;
     const t = audioCtx.currentTime;
-    if (kind==='tick'){
-      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-      o.type='square'; o.frequency.setValueAtTime(440, t);
-      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.05,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.08);
-      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+0.09);
-    } else if (kind==='boom'){
+    if (kind==='boom'){
       const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
       o.type='sawtooth'; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40,t+0.4);
       g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
@@ -858,7 +849,6 @@ body{
   }
 
   // ===== Game loop =====
-  
   let raf, lastTime;
   function begin(){
     buildLanes(); spawnCars();
@@ -866,30 +856,23 @@ body{
     lives = 3; t0 = performance.now(); timeNow = 0;
     resizeCanvas();
     window.addEventListener('keydown', onKey);
-    window.addEventListener('keydown', onEscClose);
     running = true; lastTime = performance.now();
     tick();
   }
   function resetGame(){
-  px = START_POS.x;
-  py = START_POS.y;
-  lives = 3;
-  t0 = performance.now();
-  spawnCars();
-}
-
-  function onEscClose(e){ if (e.key === 'Escape') stopPanzer(); }
-
+    px = START_POS.x; py = START_POS.y; lives = 3;
+    t0 = performance.now(); spawnCars();
+    // keep playing immediately
+  }
 
   function tick(){
     if (!running) return;
     raf = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = Math.min(32, now - lastTime)/1000; // clamp
-    lastTime = now;
+    const dt = Math.min(32, now - lastTime)/1000; lastTime = now;
     timeNow = (now - t0)/1000;
 
-    // update cars
+    // move cars
     lanes.forEach(l=>{
       const v = l.speed * CELL * scale * l.dir;
       l.cars.forEach(c=>{
@@ -900,15 +883,15 @@ body{
       });
     });
 
-    // collisions (only on road rows 3..10)
+    // collisions only on road rows 2..9
     if (py >= 2 && py <= 9){
       const lane = lanes.find(L=>L.y===py);
-      const pxPix = colX(px)+CELL*scale*0.15, pwPix = CELL*scale*0.70;
-      const pyPix = rowY(py)+CELL*scale*0.10, phPix = CELL*scale*0.80;
       if (lane){
+        const pxPix = colX(px)+CELL*scale*0.15, pwPix = CELL*scale*0.70;
+        const pyPix = rowY(py)+CELL*scale*0.10, phPix = CELL*scale*0.80;
         for (const c of lane.cars){
           if (rectsOverlap(pxPix, pyPix, pwPix, phPix, c.x, rowY(py)+CELL*scale*0.12, c.w, CELL*scale*0.76)){
-            // hit
+            // hit: lose life and reset to start
             lives--; sfx('boom');
             px = START_POS.x; py = START_POS.y;
             if (lives<=0){ gameOver(false); return; }
@@ -918,19 +901,12 @@ body{
       }
     }
 
-    // win if top reached
-    if (py <= 1){
-      gameOver(true);
-      return;
-    }
-
     // draw
     drawScene();
     updateHud();
   }
-  function clamp(v, min, max){ return v < min ? min : (v > max ? max : v); }
+
   function drawScene(){
-    // clear
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg');
     ctx.fillRect(0,0,W,H);
 
@@ -939,65 +915,53 @@ body{
     // cars
     lanes.forEach(l=> l.cars.forEach(c=> drawCar(l,c)) );
 
-    // player tank
+    // tank
     drawTank(px, py);
 
-    // finish banner at the top
-ctx.fillStyle = colorMix('#89ffd9', 0.18);
-rect(0, rowY(0), W, rowH(1));
-ctx.fillStyle = colorMix('#ffffff', 0.35);
-ctx.font = `${14*scale}px Inter, system-ui, sans-serif`;
-ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-ctx.fillText('Goal', W/2, rowY(0) + rowH(0.5));
-
+    // “Goal” banner at top
+    ctx.fillStyle = colorMix('#89ffd9', 0.18);
+    rect(0, rowY(0), W, rowH(1));
+    ctx.fillStyle = colorMix('#ffffff', 0.35);
+    ctx.font = `${14*scale}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Goal', W/2, rowY(0) + rowH(0.5));
   }
-function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
-  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
-}
+
   function updateHud(){
     overlay.querySelector('#hudTime').textContent = timeNow.toFixed(1);
     overlay.querySelector('#hudLives').textContent = lives;
   }
 
- function gameOver(win){
-  running = false;
-  cancelAnimationFrame(raf);
-  sfx(win ? 'win' : 'boom');
+  function gameOver(win){
+    running = false; cancelAnimationFrame(raf);
+    sfx(win ? 'win' : 'boom');
 
-  const banner = document.createElement('div');
-  Object.assign(banner.style, {
-    position:'absolute', inset:'0', display:'grid', placeItems:'center',
-    background:'rgba(0,0,0,.45)', color:'var(--fg)', fontWeight:'800',
-    fontSize:'clamp(20px,3.6vw,32px)', zIndex: 5
-  });
-  banner.innerHTML = `
-    <div class="card" style="padding:18px 16px; text-align:center; max-width:420px">
-      <div style="font-size:1.1em; margin-bottom:4px">
-        ${win ? '✅ Mission complete!' : '💥 Tank disabled'}
-      </div>
-      <div style="font-weight:600;font-size:.8em;margin:.3em 0 .8em;opacity:.85">
-        Time: ${timeNow.toFixed(1)}s
-      </div>
-      <div style="display:flex; gap:10px; justify-content:center">
-        <button id="again" class="button small">⟳ Play again</button>
-        <button id="close" class="button small ghost">✕ Close</button>
-      </div>
-    </div>`;
-  wrap.appendChild(banner);
+    const banner = document.createElement('div');
+    Object.assign(banner.style, {
+      position:'absolute', inset:'0', display:'grid', placeItems:'center',
+      background:'rgba(0,0,0,.45)', color:'var(--fg)', fontWeight:'800',
+      fontSize:'clamp(20px,3.6vw,32px)', zIndex:5
+    });
+    banner.innerHTML = `
+      <div class="card" style="padding:18px 16px; text-align:center; max-width:420px">
+        <div style="font-size:1.1em; margin-bottom:4px">
+          ${win ? '✅ Mission complete!' : '💥 Tank disabled'}
+        </div>
+        <div style="font-weight:600;font-size:.8em;margin:.3em 0 .8em;opacity:.85">
+          Time: ${timeNow.toFixed(1)}s
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center">
+          <button id="again" class="button small">⟳ Play again</button>
+          <button id="close" class="button small ghost">✕ Close</button>
+        </div>
+      </div>`;
+    wrap.appendChild(banner);
 
-  const again = banner.querySelector('#again');
-  const close = banner.querySelector('#close');
-  again.addEventListener('click', ()=>{
-    banner.remove();
-    resetGame();
-    running = true; lastTime = performance.now(); tick();
-  });
-  close.addEventListener('click', ()=>{
-    banner.remove();
-    stopPanzer();
-  });
-  again.focus(); // UX: make Enter restart quickly
-}
+    banner.querySelector('#again').addEventListener('click', ()=>{
+      banner.remove(); resetGame(); running=true; lastTime=performance.now(); tick();
+    });
+    banner.querySelector('#close').addEventListener('click', ()=>{ banner.remove(); stopPanzer(); });
+  }
 })();
 </script>
 </body>

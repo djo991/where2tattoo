@@ -602,19 +602,17 @@ body{
   }
   tick();
 }
-/* ===== PANZER MINI-GAME (centered grid + scaled cars) ===== */
+
+/* ===== PANZER MINI-GAME (full-bleed grid, anisotropic scale) ===== */
 (function(){
   const REDUCE_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // DOM refs
   let overlay=null, wrap=null, cvs=null, ctx=null, dpad=null;
 
   // Grid
-  const COLS=11, ROWS=12, CELL=48;
+  const COLS=11, ROWS=12, CELL=48;      // CELL is just a logical baseline
   let W=COLS*CELL, H=ROWS*CELL;
-  let scale=1, prevScale=1;
-  let GRID_W=COLS*CELL, GRID_H=ROWS*CELL;
-  let X0=0, Y0=0;                      // grid top-left inside the canvas
+  let cellW=48, cellH=48, prevCellW=48;
 
   // Player/state
   const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 };
@@ -650,15 +648,15 @@ body{
     ].forEach(s => lanes.push({...s, cars:[]}));
   }
 
-  // Spawn cars in **scaled** units so drawing/motion/warp agree
+  // Cars are stored in canvas pixels (x,w). Use cellW so they scale with width.
   function spawnCars(){
     lanes.forEach(l=>{
       l.cars.length=0;
       const span = COLS + 6;
       const count = Math.max(2, Math.floor(span * l.density));
       for (let i=0;i<count;i++){
-        const w = (1.5 + Math.random()*1.3) * CELL * scale;               // scaled
-        const x = (Math.random()*span - 3) * CELL * scale;                 // scaled
+        const w = (1.5 + Math.random()*1.3) * cellW;
+        const x = (Math.random()*span - 3) * cellW;
         l.cars.push({ x, w });
       }
     });
@@ -702,12 +700,10 @@ body{
     addEventListener('resize', resizeCanvas);
     resizeCanvas();
   }
-
   function removeOverlay(){
     if (!overlay) return;
     removeEventListener('resize', resizeCanvas);
-    overlay.remove();
-    overlay=null; wrap=cvs=ctx=dpad=null;
+    overlay.remove(); overlay=null; wrap=cvs=ctx=dpad=null;
   }
 
   window.startPanzer = function(){
@@ -724,68 +720,55 @@ body{
     removeOverlay();
   }
 
-  // Geometry helpers – now include X0/Y0 offset so the grid is centered
+  // --- geometry helpers (full canvas -> grid cells) ---
   function resizeCanvas(){
     const r=wrap.getBoundingClientRect();
     W=r.width; H=r.height;
-
-    const newScale = Math.min(W/(COLS*CELL), H/(ROWS*CELL));
-    const factor   = lanes.length ? (newScale/scale) : 1;
-
-    // keep cars sized/positioned when scale changes
+    const newCellW = W / COLS;
+    const factor = newCellW / (cellW || newCellW);
+    prevCellW = cellW || newCellW;
+    cellW = newCellW;
+    cellH = H / ROWS;
+    // keep cars visually in place when width changes
     lanes.forEach(l => l.cars.forEach(c => { c.x *= factor; c.w *= factor; }));
-
-    prevScale = scale;
-    scale = newScale;
-
-    GRID_W = COLS*CELL*scale;
-    GRID_H = ROWS*CELL*scale;
-    X0 = (W - GRID_W)/2;
-    Y0 = (H - GRID_H)/2;
-
     cvs.width=W; cvs.height=H;
   }
-
-  const colX = c => X0 + c * CELL * scale;
-  const rowY = r => Y0 + r * CELL * scale;
-  const rowH = n =>        n * CELL * scale;
+  const colX = c => c * cellW;
+  const rowY = r => r * cellH;
+  const rowH = n => n * cellH;
   const rect = (x,y,w,h)=> ctx.fillRect(x,y,w,h);
   function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
   function roundRect(x,y,w,h,r,fill){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); fill?ctx.fill():ctx.stroke(); }
-  const colorMix = (hex,a)=>`color-mix(in oklab, ${hex} ${a*100}%, var(--bg))`;
   const clamp = (v,min,max)=> v<min?min:(v>max?max:v);
   const rectsOverlap = (ax,ay,aw,ah,bx,by,bw,bh)=> ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
 
-  // Drawing – use GRID_W/GRID_H and X0/Y0 (not W/H) for the road
   function drawRoad(){
     const p=palette();
-    ctx.fillStyle=p.safe;   rect(X0, rowY(0), GRID_W, rowH(2));               // top safe
-                            rect(X0, rowY(ROWS-2), GRID_W, rowH(2));           // bottom safe
-    ctx.fillStyle=p.asphalt; rect(X0, rowY(2), GRID_W, rowH(ROWS-4));          // road
-    for(let r=2;r<ROWS-2;r++){ if(r%2===1){ ctx.fillStyle=p.asphaltAlt; rect(X0,rowY(r),GRID_W,rowH(1)); } }
+    // full-bleed road drawn across W/H
+    ctx.fillStyle=p.safe;   rect(0, rowY(0), W, rowH(2));
+                            rect(0, rowY(ROWS-2), W, rowH(2));
+    ctx.fillStyle=p.asphalt; rect(0, rowY(2), W, rowH(ROWS-4));
+    for(let r=2;r<ROWS-2;r++){ if(r%2===1){ ctx.fillStyle=p.asphaltAlt; rect(0,rowY(r),W,rowH(1)); } }
     ctx.strokeStyle=p.lane; ctx.setLineDash([12,12]); ctx.lineWidth=2;
-    for(let r=2;r<ROWS-2;r++){ const y=rowY(r)+rowH(1)/2; line(X0,y,X0+GRID_W,y); }
+    for(let r=2;r<ROWS-2;r++){ const y=rowY(r)+rowH(1)/2; line(0,y,W,y); }
     ctx.setLineDash([]);
-    ctx.fillStyle=p.finish; rect(X0, rowY(2)-rowH(.15), GRID_W, rowH(.15));    // finish stripe
+    ctx.fillStyle=p.finish; rect(0, rowY(2)-rowH(.15), W, rowH(.15));
   }
-
   function drawTank(x,y){
-    const p=palette(), s=CELL*scale, gx=colX(x), gy=rowY(y);
-    ctx.fillStyle=p.highlight; roundRect(gx+s*.06, gy+s*.06, s*.88, s*.88, 10, true);
-    ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5; roundRect(gx+s*.06, gy+s*.06, s*.88, s*.88, 10, false);
-    ctx.fillStyle='rgba(0,0,0,.7)'; roundRect(gx+s*.10, gy+s*.18, s*.80, s*.14, 6, true); roundRect(gx+s*.10, gy+s*.68, s*.80, s*.14, 6, true);
-    ctx.fillStyle=p.tankHull;   roundRect(gx+s*.18, gy+s*.30, s*.64, s*.40, 8, true);
-    ctx.fillStyle=p.tankTurret; roundRect(gx+s*.40, gy+s*.38, s*.26, s*.24, 6, true); ctx.fillRect(gx+s*.66, gy+s*.46, s*.32, s*.08);
+    const p=palette(), sX=cellW, sY=cellH, gx=colX(x), gy=rowY(y);
+    ctx.fillStyle=p.highlight; roundRect(gx+sX*.06, gy+sY*.06, sX*.88, sY*.88, 10, true);
+    ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5; roundRect(gx+sX*.06, gy+sY*.06, sX*.88, sY*.88, 10, false);
+    ctx.fillStyle='rgba(0,0,0,.7)'; roundRect(gx+sX*.10, gy+sY*.18, sX*.80, sY*.14, 6, true); roundRect(gx+sX*.10, gy+sY*.68, sX*.80, sY*.14, 6, true);
+    ctx.fillStyle=p.tankHull;   roundRect(gx+sX*.18, gy+sY*.30, sX*.64, sY*.40, 8, true);
+    ctx.fillStyle=p.tankTurret; roundRect(gx+sX*.40, gy+sY*.38, sX*.26, sY*.24, 6, true); ctx.fillRect(gx+sX*.66, gy+sY*.46, sX*.32, sY*.08);
   }
-
   function drawCar(lane,car){
-    const p=palette(), gx=X0 + car.x, gy=rowY(lane.y)+CELL*scale*.12, h=CELL*scale*.76;
+    const p=palette(), gx=car.x, gy=rowY(lane.y)+cellH*.12, h=cellH*.76;
     ctx.save(); ctx.shadowBlur=10; ctx.shadowColor='rgba(255,255,255,.25)';
     ctx.fillStyle = lane.dir>0 ? p.carA : p.carB; roundRect(gx,gy,car.w,h,10, true); ctx.restore();
     ctx.strokeStyle=p.outline; ctx.lineWidth=2; roundRect(gx,gy,car.w,h,10,false);
   }
 
-  // Input
   function onKey(e){
     if(!running) return;
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault();
@@ -799,7 +782,6 @@ body{
     if(py<=1) gameOver(true);
   }
 
-  // SFX
   function sfx(kind){
     if (!audioCtx || REDUCE_MOTION) return;
     const t=audioCtx.currentTime;
@@ -814,11 +796,9 @@ body{
     }
   }
 
-  // Loop
   function begin(){
     buildLanes();
-    // ensure geometry (and scale) are set before spawning
-    resizeCanvas();
+    resizeCanvas();            // compute cellW/cellH first
     spawnCars();
 
     px=START_POS.x; py=START_POS.y; lives=3; t0=performance.now(); timeNow=0;
@@ -835,24 +815,24 @@ body{
     const now=performance.now(), dt=Math.min(32, now-lastTime)/1000; lastTime=now;
     timeNow=(now-t0)/1000;
 
-    // move + wrap using GRID_W (logical width)
+    // Move + wrap using full width W
     lanes.forEach(l=>{
-      const v=l.speed*CELL*scale*l.dir, off=3*CELL*scale;
+      const v=l.speed*cellW*l.dir, off=3*cellW;
       l.cars.forEach(c=>{
-        c.x += v*dt;
-        if(l.dir>0 && c.x > GRID_W+off) c.x = -c.w - off;
-        if(l.dir<0 && c.x < -c.w - off) c.x = GRID_W + off;
+        c.x += v * dt;
+        if(l.dir>0 && c.x > W+off)   c.x = -c.w - off;
+        if(l.dir<0 && c.x < -c.w-off) c.x = W + off;
       });
     });
 
-    // collisions only on road rows 2..9
+    // Collisions (rows 2..9)
     if(py>=2 && py<=9){
       const lane=lanes.find(L=>L.y===py);
       if(lane){
-        const pxPix=colX(px)+CELL*scale*.15, pwPix=CELL*scale*.70;
-        const pyPix=rowY(py)+CELL*scale*.10, phPix=CELL*scale*.80;
+        const pxPix=colX(px)+cellW*.15, pwPix=cellW*.70;
+        const pyPix=rowY(py)+cellH*.10, phPix=cellH*.80;
         for(const c of lane.cars){
-          if(rectsOverlap(pxPix,pyPix,pwPix,phPix, X0+c.x, rowY(py)+CELL*scale*.12, c.w, CELL*scale*.76)){
+          if(rectsOverlap(pxPix,pyPix,pwPix,phPix, c.x, rowY(py)+cellH*.12, c.w, cellH*.76)){
             lives--; sfx('boom'); px=START_POS.x; py=START_POS.y;
             if(lives<=0){ gameOver(false); return; }
             break;
@@ -867,15 +847,14 @@ body{
   function drawScene(){
     ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg');
     ctx.fillRect(0,0,W,H);
-
     drawRoad();
     lanes.forEach(l=>l.cars.forEach(c=>drawCar(l,c)));
     drawTank(px,py);
 
-    // “Goal” banner at top
-    ctx.fillStyle=colorMix('#89ffd9', .18); rect(X0, rowY(0), GRID_W, rowH(1));
-    ctx.fillStyle=colorMix('#ffffff', .35); ctx.font=`${14*scale}px Inter, system-ui, sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Goal', X0 + GRID_W/2, rowY(0)+rowH(.5));
+    // Goal banner (fixed rgba to avoid color-mix() oddities in canvas)
+    ctx.fillStyle='rgba(124,247,212,0.18)'; rect(0, rowY(0), W, rowH(1));
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font=`${14*(cellH/48)}px Inter, system-ui, sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Goal', W/2, rowY(0)+rowH(.5));
   }
   function updateHud(){
     overlay.querySelector('#hudTime').textContent=timeNow.toFixed(1);
@@ -902,6 +881,7 @@ body{
     banner.querySelector('#close').addEventListener('click', ()=>{ banner.remove(); stopPanzer(); });
   }
 })();
+
 </script>
 </body>
 </html>

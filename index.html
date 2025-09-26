@@ -616,6 +616,7 @@ body{
 
   // Player/state
   const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 };
+  const speedMultiplier = 1.1;
   let px, py, lives, t0, timeNow, running=false, raf=null, lastTime=0;
 
   // Lanes/cars
@@ -765,7 +766,7 @@ body{
   function drawCar(lane, car){
   const p = palette();
   const x = car.x;
-  const y = rowY(lane.y) + cellH * 0.12;
+  const y = rowY(lane.row) + cellH * 0.12;
   const h = cellH * 0.76;
 
   ctx.save();
@@ -828,7 +829,7 @@ body{
 
     // Move + wrap using full width W
     lanes.forEach(l=>{
-  const v   = l.speed * cellW * l.dir;     // pixels/sec
+      const v = l.speed * cellW * l.dir * speedMultiplier;
   const off = 2 * cellW;                   // wrap buffer
   l.cars.forEach(c=>{
     c.x += v * dt;
@@ -839,7 +840,7 @@ body{
 
     // Collisions (rows 2..9)
     if(py>=2 && py<=9){
-      const lane=lanes.find(L=>L.y===py);
+      const lane = lanes.find(L => L.row === py);
       if(lane){
         const pxPix=colX(px)+cellW*.15, pwPix=cellW*.70;
         const pyPix=rowY(py)+cellH*.10, phPix=cellH*.80;

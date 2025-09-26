@@ -603,13 +603,24 @@ body{
   tick();
 }
 
-// ===================== PANZER MINI-GAME =====================
 (function(){
   const REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Create overlay on demand
-  let overlay, wrap, cvs, ctx, dpad;
+  // DOM refs (one overlay only)
+  let overlay=null, wrap=null, cvs=null, ctx=null, dpad=null;
 
+  // Grid + sizing
+  const COLS=11, ROWS=12, CELL=48;
+  let W=COLS*CELL, H=ROWS*CELL, scale=1;
+
+  // Player / state
+  const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 };
+  let px, py, lives, t0, timeNow, running=false, raf=null, lastTime=0;
+
+  // Lanes
+  const lanes=[];
+
+  // Palette from theme
   function palette(){
     const light = document.documentElement.getAttribute('data-theme') === 'light';
     return light ? {
@@ -623,9 +634,37 @@ body{
     };
   }
 
+  // Build / spawn
+  function buildLanes(){
+    lanes.length=0;
+    [
+      {row:9, dir: 1, speed:2.8, density:.22},
+      {row:8, dir:-1, speed:3.6, density:.25},
+      {row:7, dir: 1, speed:2.2, density:.20},
+      {row:6, dir:-1, speed:4.0, density:.28},
+      {row:5, dir: 1, speed:3.2, density:.22},
+      {row:4, dir:-1, speed:2.6, density:.20},
+      {row:3, dir: 1, speed:3.8, density:.28},
+      {row:2, dir:-1, speed:2.4, density:.22},
+    ].forEach(s => lanes.push({...s, cars:[]}));
+  }
+  function spawnCars(){
+    lanes.forEach(l=>{
+      l.cars.length=0;
+      const span = COLS + 6, count = Math.max(2, Math.floor(span*l.density));
+      for (let i=0;i<count;i++){
+        const w = (1.5 + Math.random()*1.3) * CELL;
+        const x = (Math.random()*span - 3) * CELL;
+        l.cars.push({ x, w });
+      }
+    });
+  }
+
+  // DOM overlay (create once per run)
   function ensureOverlay(){
     if (overlay) return;
-    overlay = document.createElement('div'); overlay.id = 'gameOverlay';
+    overlay = document.createElement('div');
+    overlay.id = 'gameOverlay';
     overlay.innerHTML = `
       <div id="gameWrap">
         <button id="closeGame" aria-label="Close game">✕</button>
@@ -634,7 +673,6 @@ body{
           <button class="pill" id="btnRestart">⟳ Restart</button>
         </div>
         <canvas id="gameCanvas"></canvas>
-
         <div id="gameDpad" aria-hidden="false">
           <button class="up"    data-dx="0"  data-dy="-1">↑</button>
           <button class="left"  data-dx="-1" data-dy="0">←</button>
@@ -651,318 +689,184 @@ body{
 
     overlay.querySelector('#closeGame').addEventListener('click', stopPanzer);
     overlay.querySelector('#btnRestart').addEventListener('click', resetGame);
-
-    // touch/click D-pad
     dpad.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click', ()=> movePlayer(parseInt(b.dataset.dx,10), parseInt(b.dataset.dy,10)));
+      b.addEventListener('click', ()=> movePlayer(+b.dataset.dx, +b.dataset.dy));
     });
-
     window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+  }
+  function removeOverlay(){
+    if (!overlay) return;
+    window.removeEventListener('resize', resizeCanvas);
+    overlay.remove(); overlay=null; wrap=cvs=ctx=dpad=null;
   }
 
-  // Public launcher
-  window.startPanzer = function startPanzer(){
+  // Public start
+  window.startPanzer = function(){
     ensureOverlay();
-    overlay.style.display = 'grid';    // keep centered
+    overlay.style.display = 'grid';
     begin();
   };
 
-  // Public closer
+  // Close + teardown (fixes the “stuck after close” bug)
   function stopPanzer(){
-    running = false;
-    overlay.style.display = 'none';
+    running=false;
+    if (raf) cancelAnimationFrame(raf);
     window.removeEventListener('keydown', onKey);
+    removeOverlay();
   }
 
-  // ===== Game state =====
-  const COLS = 11, ROWS = 12;     // grid
-  const CELL = 48;                // base size (will scale)
-  let W=COLS*CELL, H=ROWS*CELL, scale=1;
-
-  // Player position
-  const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 }; // bottom row
-  let px, py, lives, t0, timeNow, running=false;
-
-  // Lanes (rows 2..9 are road)
-  const lanes = []; // each: { y, dir, speed, density, cars[] }
-  function buildLanes(){
-    lanes.length = 0;
-    const specs = [
-      {row:9, dir: 1, speed: 2.8, density: 0.22},
-      {row:8, dir:-1, speed: 3.6, density: 0.25},
-      {row:7, dir: 1, speed: 2.2, density: 0.20},
-      {row:6, dir:-1, speed: 4.0, density: 0.28},
-      {row:5, dir: 1, speed: 3.2, density: 0.22},
-      {row:4, dir:-1, speed: 2.6, density: 0.20},
-      {row:3, dir: 1, speed: 3.8, density: 0.28},
-      {row:2, dir:-1, speed: 2.4, density: 0.22},
-    ];
-    specs.forEach(s => lanes.push({ y:s.row, dir:s.dir, speed:s.speed, density:s.density, cars:[] }));
-  }
-
-  // Obstacles
-  function spawnCars(){
-    lanes.forEach(l=>{
-      l.cars.length = 0;
-      const span = COLS + 6;
-      const count = Math.max(2, Math.floor(span * l.density));
-      for (let i=0;i<count;i++){
-        const w = 1.5 + Math.random()*1.3;  // in cells
-        const x = (Math.random()*span - 3) * CELL;
-        l.cars.push({ x, w: w*CELL });
-      }
-    });
-  }
-
-  // ===== Rendering helpers =====
-  function resizeCanvas(){
-    const r = wrap.getBoundingClientRect();
-    W = r.width; H = r.height;
-    scale = Math.min(W/(COLS*CELL), H/(ROWS*CELL));
-    cvs.width = W; cvs.height = H;
-  }
+  // Geometry / helpers
+  function resizeCanvas(){ const r=wrap.getBoundingClientRect(); W=r.width; H=r.height; scale=Math.min(W/(COLS*CELL), H/(ROWS*CELL)); cvs.width=W; cvs.height=H; }
   function colX(c){ return c * CELL * scale; }
-  function rowY(r){ return r * CELL * scale; }  // row 0 = top
+  function rowY(r){ return r * CELL * scale; } // 0 = top
   function rowH(n){ return n * CELL * scale; }
   function rect(x,y,w,h){ ctx.fillRect(x,y,w,h); }
   function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
-  function roundRect(x,y,w,h,r,fill){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
-    if (fill) ctx.fill(); else ctx.stroke();
-  }
-  function colorMix(hex, alpha){ return `color-mix(in oklab, ${hex} ${alpha*100}%, var(--bg))`; }
-  function clamp(v, min, max){ return v < min ? min : (v > max ? max : v); }
-  function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
-    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
-  }
+  function roundRect(x,y,w,h,r,fill){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); fill?ctx.fill():ctx.stroke(); }
+  function colorMix(hex,a){ return `color-mix(in oklab, ${hex} ${a*100}%, var(--bg))`; }
+  function clamp(v,min,max){ return v<min?min:(v>max?max:v); }
+  function rectsOverlap(ax,ay,aw,ah,bx,by,bw,bh){ return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by; }
 
+  // Draw
   function drawRoad(){
-    const p = palette();
-    // goal (top 2 rows) + start (bottom 2 rows)
-    ctx.fillStyle = p.safe;
-    rect(0, rowY(0), W, rowH(2));
-    rect(0, rowY(ROWS-2), W, rowH(2));
-
-    // asphalt middle (rows 2..9)
-    ctx.fillStyle = p.asphalt;
-    rect(0, rowY(2), W, rowH(ROWS-4));
-
-    // alternating bands
-    for (let r=2; r<ROWS-2; r++){
-      if (r % 2 === 1){
-        ctx.fillStyle = p.asphaltAlt;
-        rect(0, rowY(r), W, rowH(1));
-      }
-    }
-
-    // dashed lane markers
-    ctx.strokeStyle = p.lane;
-    ctx.setLineDash([12,12]);
-    ctx.lineWidth = 2;
-    for (let r=2; r<ROWS-2; r++){
-      const y = rowY(r) + rowH(1)/2;
-      line(0, y, W, y);
-    }
+    const p=palette();
+    ctx.fillStyle=p.safe;   rect(0, rowY(0), W, rowH(2));                 // top safe
+    rect(0, rowY(ROWS-2), W, rowH(2));                                    // bottom safe
+    ctx.fillStyle=p.asphalt; rect(0, rowY(2), W, rowH(ROWS-4));            // road
+    for(let r=2;r<ROWS-2;r++){ if(r%2===1){ ctx.fillStyle=p.asphaltAlt; rect(0,rowY(r),W,rowH(1)); } }
+    ctx.strokeStyle=p.lane; ctx.setLineDash([12,12]); ctx.lineWidth=2;
+    for(let r=2;r<ROWS-2;r++){ const y=rowY(r)+rowH(1)/2; line(0,y,W,y); }
     ctx.setLineDash([]);
-
-    // finish stripe at top edge of goal zone
-    ctx.fillStyle = p.finish;
-    rect(0, rowY(2)-rowH(.15), W, rowH(.15));
+    ctx.fillStyle=p.finish; rect(0, rowY(2)-rowH(.15), W, rowH(.15));     // finish stripe
+  }
+  function drawTank(x,y){
+    const p=palette(), s=CELL*scale, gx=colX(x), gy=rowY(y);
+    ctx.fillStyle=p.highlight; roundRect(gx+s*.06, gy+s*.06, s*.88, s*.88, 10, true);
+    ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5; roundRect(gx+s*.06, gy+s*.06, s*.88, s*.88, 10, false);
+    ctx.fillStyle='rgba(0,0,0,.7)'; roundRect(gx+s*.10, gy+s*.18, s*.80, s*.14, 6, true); roundRect(gx+s*.10, gy+s*.68, s*.80, s*.14, 6, true);
+    ctx.fillStyle=p.tankHull;   roundRect(gx+s*.18, gy+s*.30, s*.64, s*.40, 8, true);
+    ctx.fillStyle=p.tankTurret; roundRect(gx+s*.40, gy+s*.38, s*.26, s*.24, 6, true); ctx.fillRect(gx+s*.66, gy+s*.46, s*.32, s*.08);
+  }
+  function drawCar(lane,car){
+    const p=palette(), gx=car.x, gy=rowY(lane.y)+CELL*scale*.12, h=CELL*scale*.76;
+    ctx.save(); ctx.shadowBlur=10; ctx.shadowColor='rgba(255,255,255,.25)';
+    ctx.fillStyle = lane.dir>0 ? p.carA : p.carB; roundRect(gx,gy,car.w,h,10, true); ctx.restore();
+    ctx.strokeStyle=p.outline; ctx.lineWidth=2; roundRect(gx,gy,car.w,h,10,false);
   }
 
-  function drawTank(x, y){
-    const p = palette();
-    const s = CELL*scale;
-    const gx = colX(x), gy = rowY(y);
-
-    // highlight tile
-    ctx.fillStyle = p.highlight;
-    roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, true);
-    ctx.strokeStyle = 'rgba(255,255,255,.6)';
-    ctx.lineWidth = 1.5;
-    roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, false);
-
-    // tracks
-    ctx.fillStyle = 'rgba(0,0,0,.7)';
-    roundRect(gx + s*0.10, gy + s*0.18, s*0.80, s*0.14, 6, true);
-    roundRect(gx + s*0.10, gy + s*0.68, s*0.80, s*0.14, 6, true);
-
-    // hull
-    ctx.fillStyle = p.tankHull;
-    roundRect(gx + s*0.18, gy + s*0.30, s*0.64, s*0.40, 8, true);
-
-    // turret + barrel
-    ctx.fillStyle = p.tankTurret;
-    roundRect(gx + s*0.40, gy + s*0.38, s*0.26, s*0.24, 6, true);
-    ctx.fillRect(gx + s*0.66, gy + s*0.46, s*0.32, s*0.08);
-  }
-
-  function drawCar(lane, car){
-    const p = palette();
-    const gx = car.x;
-    const gy = rowY(lane.y) + CELL*scale*0.12;
-    const h = CELL*scale*0.76;
-
-    ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = 'rgba(255,255,255,.25)';
-    ctx.fillStyle = lane.dir > 0 ? p.carA : p.carB;
-    roundRect(gx, gy, car.w, h, 10, true);
-    ctx.restore();
-
-    ctx.strokeStyle = p.outline;
-    ctx.lineWidth = 2;
-    roundRect(gx, gy, car.w, h, 10, false);
-  }
-
-  // ===== Input & SFX =====
+  // Input
   function onKey(e){
-    if (!running) return;
-    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault();
-    if (e.key==='Escape'){ stopPanzer(); return; }
-    const map = {ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0],
-                 w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], W:[0,-1], S:[0,1], A:[-1,0], D:[1,0]};
-    if (map[e.key]) movePlayer(map[e.key][0], map[e.key][1]);
+    if(!running) return;
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault();
+    if(e.key==='Escape'){ stopPanzer(); return; }
+    const map={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]};
+    if(map[e.key]) movePlayer(map[e.key][0], map[e.key][1]);
   }
-  function movePlayer(dx, dy){
-    px = clamp(px + dx, 0, COLS-1);
-    py = clamp(py + dy, 0, ROWS-1);
-    if (py <= 1) { gameOver(true); } // reached top safe zone
+  function movePlayer(dx,dy){
+    px = clamp(px+dx, 0, COLS-1);
+    py = clamp(py+dy, 0, ROWS-1);
+    if(py<=1) gameOver(true);
   }
 
+  // SFX (minimal)
   function sfx(kind){
     if (!audioCtx || REDUCE_MOTION) return;
-    const t = audioCtx.currentTime;
-    if (kind==='boom'){
-      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    const t=audioCtx.currentTime;
+    if(kind==='boom'){ const o=audioCtx.createOscillator(), g=audioCtx.createGain();
       o.type='sawtooth'; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40,t+0.4);
       g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
       o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+0.5);
-    } else if (kind==='win'){
-      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    } else if(kind==='win'){ const o=audioCtx.createOscillator(), g=audioCtx.createGain();
       o.type='triangle'; o.frequency.setValueAtTime(520,t); o.frequency.setValueAtTime(660,t+0.12); o.frequency.setValueAtTime(880,t+0.26);
       g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
       o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+0.65);
     }
   }
 
-  // ===== Game loop =====
-  let raf, lastTime;
+  // Loop
   function begin(){
     buildLanes(); spawnCars();
-    px = START_POS.x; py = START_POS.y;
-    lives = 3; t0 = performance.now(); timeNow = 0;
-    resizeCanvas();
+    px=START_POS.x; py=START_POS.y; lives=3; t0=performance.now(); timeNow=0;
     window.addEventListener('keydown', onKey);
-    running = true; lastTime = performance.now();
-    tick();
+    running=true; lastTime=performance.now(); tick();
   }
   function resetGame(){
-    px = START_POS.x; py = START_POS.y; lives = 3;
-    t0 = performance.now(); spawnCars();
-    // keep playing immediately
+    px=START_POS.x; py=START_POS.y; lives=3; t0=performance.now(); spawnCars();
   }
 
   function tick(){
-    if (!running) return;
-    raf = requestAnimationFrame(tick);
-    const now = performance.now();
-    const dt = Math.min(32, now - lastTime)/1000; lastTime = now;
-    timeNow = (now - t0)/1000;
+    if(!running) return;
+    raf=requestAnimationFrame(tick);
+    const now=performance.now(), dt=Math.min(32, now-lastTime)/1000; lastTime=now;
+    timeNow=(now-t0)/1000;
 
-    // move cars
+    // cars
     lanes.forEach(l=>{
-      const v = l.speed * CELL * scale * l.dir;
+      const v=l.speed*CELL*scale*l.dir, off=3*CELL*scale;
       l.cars.forEach(c=>{
-        c.x += v * dt;
-        const off = 3*CELL*scale;
-        if (l.dir>0 && c.x > W+off) c.x = -c.w - off;
-        if (l.dir<0 && c.x < -c.w - off) c.x = W + off;
+        c.x += v*dt;
+        if(l.dir>0 && c.x > W+off) c.x = -c.w - off;
+        if(l.dir<0 && c.x < -c.w - off) c.x = W + off;
       });
     });
 
-    // collisions only on road rows 2..9
-    if (py >= 2 && py <= 9){
-      const lane = lanes.find(L=>L.y===py);
-      if (lane){
-        const pxPix = colX(px)+CELL*scale*0.15, pwPix = CELL*scale*0.70;
-        const pyPix = rowY(py)+CELL*scale*0.10, phPix = CELL*scale*0.80;
-        for (const c of lane.cars){
-          if (rectsOverlap(pxPix, pyPix, pwPix, phPix, c.x, rowY(py)+CELL*scale*0.12, c.w, CELL*scale*0.76)){
-            // hit: lose life and reset to start
-            lives--; sfx('boom');
-            px = START_POS.x; py = START_POS.y;
-            if (lives<=0){ gameOver(false); return; }
+    // collisions: road rows 2..9
+    if(py>=2 && py<=9){
+      const lane=lanes.find(L=>L.y===py);
+      if(lane){
+        const pxPix=colX(px)+CELL*scale*.15, pwPix=CELL*scale*.70;
+        const pyPix=rowY(py)+CELL*scale*.10, phPix=CELL*scale*.80;
+        for(const c of lane.cars){
+          if(rectsOverlap(pxPix,pyPix,pwPix,phPix, c.x, rowY(py)+CELL*scale*.12, c.w, CELL*scale*.76)){
+            lives--; sfx('boom'); px=START_POS.x; py=START_POS.y;
+            if(lives<=0){ gameOver(false); return; }
             break;
           }
         }
       }
     }
 
-    // draw
-    drawScene();
-    updateHud();
+    drawScene(); updateHud();
   }
 
   function drawScene(){
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg');
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg');
     ctx.fillRect(0,0,W,H);
-
     drawRoad();
-
-    // cars
-    lanes.forEach(l=> l.cars.forEach(c=> drawCar(l,c)) );
-
-    // tank
-    drawTank(px, py);
-
-    // “Goal” banner at top
-    ctx.fillStyle = colorMix('#89ffd9', 0.18);
-    rect(0, rowY(0), W, rowH(1));
-    ctx.fillStyle = colorMix('#ffffff', 0.35);
-    ctx.font = `${14*scale}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Goal', W/2, rowY(0) + rowH(0.5));
+    lanes.forEach(l=>l.cars.forEach(c=>drawCar(l,c)));
+    drawTank(px,py);
+    ctx.fillStyle=colorMix('#89ffd9', .18); rect(0,rowY(0),W,rowH(1));
+    ctx.fillStyle=colorMix('#ffffff', .35); ctx.font=`${14*scale}px Inter, system-ui, sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Goal', W/2, rowY(0)+rowH(.5));
   }
-
   function updateHud(){
-    overlay.querySelector('#hudTime').textContent = timeNow.toFixed(1);
-    overlay.querySelector('#hudLives').textContent = lives;
+    overlay.querySelector('#hudTime').textContent=timeNow.toFixed(1);
+    overlay.querySelector('#hudLives').textContent=lives;
   }
 
   function gameOver(win){
-    running = false; cancelAnimationFrame(raf);
-    sfx(win ? 'win' : 'boom');
-
-    const banner = document.createElement('div');
-    Object.assign(banner.style, {
-      position:'absolute', inset:'0', display:'grid', placeItems:'center',
+    running=false; if(raf) cancelAnimationFrame(raf); sfx(win?'win':'boom');
+    const banner=document.createElement('div');
+    Object.assign(banner.style,{position:'absolute',inset:'0',display:'grid',placeItems:'center',
       background:'rgba(0,0,0,.45)', color:'var(--fg)', fontWeight:'800',
-      fontSize:'clamp(20px,3.6vw,32px)', zIndex:5
-    });
-    banner.innerHTML = `
+      fontSize:'clamp(20px,3.6vw,32px)', zIndex:5});
+    banner.innerHTML=`
       <div class="card" style="padding:18px 16px; text-align:center; max-width:420px">
-        <div style="font-size:1.1em; margin-bottom:4px">
-          ${win ? '✅ Mission complete!' : '💥 Tank disabled'}
-        </div>
-        <div style="font-weight:600;font-size:.8em;margin:.3em 0 .8em;opacity:.85">
-          Time: ${timeNow.toFixed(1)}s
-        </div>
+        <div style="font-size:1.1em; margin-bottom:4px">${win?'✅ Mission complete!':'💥 Tank disabled'}</div>
+        <div style="font-weight:600;font-size:.8em;margin:.3em 0 .8em;opacity:.85">Time: ${timeNow.toFixed(1)}s</div>
         <div style="display:flex; gap:10px; justify-content:center">
           <button id="again" class="button small">⟳ Play again</button>
           <button id="close" class="button small ghost">✕ Close</button>
         </div>
       </div>`;
     wrap.appendChild(banner);
-
-    banner.querySelector('#again').addEventListener('click', ()=>{
-      banner.remove(); resetGame(); running=true; lastTime=performance.now(); tick();
-    });
+    banner.querySelector('#again').addEventListener('click', ()=>{ banner.remove(); resetGame(); running=true; lastTime=performance.now(); tick(); });
     banner.querySelector('#close').addEventListener('click', ()=>{ banner.remove(); stopPanzer(); });
   }
 })();
+
+
 </script>
 </body>
 </html>

@@ -129,23 +129,37 @@ body{
   border-radius: 10px;
 }
   /* ===== PANZER MINI-GAME ===== */
-  #gameOverlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+  #gameOverlay{position:fixed;inset:0;z-index:9999;display:grid !important;place-items:center;
   background:color-mix(in oklab,var(--bg) 55%,transparent);backdrop-filter:blur(2px);}
 #gameWrap{position:relative;width:min(980px,92vw);height:min(70vh,620px);
   background:var(--bg-soft);border:1px solid color-mix(in oklab,var(--fg) 10%,transparent);
   border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
-#gameHud{position:absolute;left:12px;top:10px;right:12px;display:flex;justify-content:space-between;gap:8px;z-index:2}
+#gameHud{position:absolute;left:12px; right:64px; top:10px;right:12px;display:flex;justify-content:space-between;gap:8px;z-index:2}
 #gameHud .pill{background:color-mix(in oklab,var(--fg) 6%,transparent);border:1px solid color-mix(in oklab,var(--fg) 14%,transparent);
   padding:6px 10px;border-radius:999px;font-weight:600}
 #gameCanvas{position:absolute;inset:0;width:100%;height:100%}
-#gameDpad{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:8px;z-index:2}
-#gameDpad button{width:48px;height:48px;border-radius:12px;border:1px solid color-mix(in oklab,var(--fg) 16%,transparent);
-  background:color-mix(in oklab,var(--fg) 6%,transparent);color:var(--fg);font-weight:700}
+#gameDpad{
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%);
+  display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(3,48px);
+  gap:8px; z-index:2;
+}
+#gameDpad .up   { grid-column:2; grid-row:1; }
+#gameDpad .left { grid-column:1; grid-row:2; }
+#gameDpad .right{ grid-column:3; grid-row:2; }
+#gameDpad .down { grid-column:2; grid-row:3; }
+#gameDpad button{
+  width:48px; height:48px; border-radius:12px;
+  border:1px solid color-mix(in oklab,var(--fg) 16%,transparent);
+  background:color-mix(in oklab,var(--fg) 6%,transparent);
+  color:var(--fg); font-weight:700;
+}
+
+  /* keep the overlay centered */
 
 /* top-right close button */
-#closeGame{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:10px;
+#closeGame{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:10px;
   border:1px solid color-mix(in oklab,var(--fg) 12%,transparent);
-  background:var(--bg);color:var(--fg);font-weight:800;z-index:3;cursor:pointer}
+  background:var(--bg);color:var(--fg);font-weight:800;z-index:4;cursor:pointer}
 #closeGame:hover{background:color-mix(in oklab,var(--fg) 6%,var(--bg))}
 @media (max-width:700px){ #gameDpad{ display:flex } }
 </style>
@@ -616,15 +630,12 @@ body{
       </div>
       <canvas id="gameCanvas"></canvas>
       <div id="gameDpad" aria-hidden="false">
-        <button data-dx="0" data-dy="-1">↑</button>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:8px">
-            <button data-dx="-1" data-dy="0">←</button>
-            <button data-dx="1" data-dy="0">→</button>
-          </div>
-          <button data-dx="0" data-dy="1">↓</button>
-        </div>
-      </div>
+  <button class="up"    data-dx="0"  data-dy="-1">↑</button>
+  <button class="left"  data-dx="-1" data-dy="0">←</button>
+  <button class="right" data-dx="1"  data-dy="0">→</button>
+  <button class="down"  data-dx="0"  data-dy="1">↓</button>
+</div>
+
     </div>`;
   document.body.appendChild(overlay);
   wrap = overlay.querySelector('#gameWrap');
@@ -645,7 +656,7 @@ body{
   // Public launcher
   window.startPanzer = function startPanzer(){
     ensureOverlay();
-    overlay.style.display = 'flex';
+    overlay.style.display = 'grid';
     begin();
   };
 
@@ -668,19 +679,20 @@ body{
   // Lanes (y from bottom to top, road on rows 2..10)
   const lanes = []; // each: { y, dir, speed, density, color }
   function buildLanes(){
-    lanes.length = 0;
-    const specs = [
-      {row:10, dir: 1, speed: 2.8,  density: 0.22},
-      {row:9,  dir:-1, speed: 3.6,  density: 0.25},
-      {row:8,  dir: 1, speed: 2.2,  density: 0.20},
-      {row:7,  dir:-1, speed: 4.0,  density: 0.28},
-      {row:6,  dir: 1, speed: 3.2,  density: 0.22},
-      {row:5,  dir:-1, speed: 2.6,  density: 0.20},
-      {row:4,  dir: 1, speed: 3.8,  density: 0.28},
-      {row:3,  dir:-1, speed: 2.4,  density: 0.22}
-    ];
-    specs.forEach(s => lanes.push({ y:s.row, dir:s.dir, speed:s.speed, density:s.density, cars:[] }));
-  }
+  lanes.length = 0;
+  const specs = [
+    {row:9, dir: 1, speed: 2.8, density: 0.22},
+    {row:8, dir:-1, speed: 3.6, density: 0.25},
+    {row:7, dir: 1, speed: 2.2, density: 0.20},
+    {row:6, dir:-1, speed: 4.0, density: 0.28},
+    {row:5, dir: 1, speed: 3.2, density: 0.22},
+    {row:4, dir:-1, speed: 2.6, density: 0.20},
+    {row:3, dir: 1, speed: 3.8, density: 0.28},
+    {row:2, dir:-1, speed: 2.4, density: 0.22},
+  ];
+  specs.forEach(s => lanes.push({ y:s.row, dir:s.dir, speed:s.speed, density:s.density, cars:[] }));
+}
+
 
   // Obstacles (cars) per lane
   function spawnCars(){
@@ -794,7 +806,7 @@ body{
 
   // ===== Math helpers =====
   function colX(c){ return c * CELL * scale; }
-  function rowY(r){ return (ROWS - r) * CELL * scale; }    // row 1 bottom
+  function rowY(r){ return r * CELL * scale; }    // row 1 bottom
   function rowH(n){ return n * CELL * scale; }
   function rect(x,y,w,h){ ctx.fillRect(x,y,w,h); }
   function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
@@ -819,7 +831,7 @@ body{
   function movePlayer(dx, dy){
   px = clamp(px + dx, 0, COLS-1);
   py = clamp(py + dy, 0, ROWS-1);
-  if (py <= 2) { gameOver(true); }   // reached the goal zone at the top
+  if (py <= 1) { gameOver(true); }   // reached the goal zone at the top
 }
 
 
@@ -889,7 +901,7 @@ body{
     });
 
     // collisions (only on road rows 3..10)
-    if (py >= 3 && py <= 10){
+    if (py >= 2 && py <= 9){
       const lane = lanes.find(L=>L.y===py);
       const pxPix = colX(px)+CELL*scale*0.15, pwPix = CELL*scale*0.70;
       const pyPix = rowY(py)+CELL*scale*0.10, phPix = CELL*scale*0.80;
@@ -907,7 +919,7 @@ body{
     }
 
     // win if top reached
-    if (py <= 2){
+    if (py <= 1){
       gameOver(true);
       return;
     }
@@ -930,14 +942,18 @@ body{
     // player tank
     drawTank(px, py);
 
-    // finish banner
-    ctx.fillStyle = colorMix('#89ffd9', 0.18);
-    rect(0, rowY(ROWS-1), W, rowH(1));
-    ctx.fillStyle = colorMix('#ffffff', 0.35);
-    ctx.font = `${14*scale}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.fillText('Goal', W/2, rowY(ROWS-1)+CELL*scale*0.65);
-  }
+    // finish banner at the top
+ctx.fillStyle = colorMix('#89ffd9', 0.18);
+rect(0, rowY(0), W, rowH(1));
+ctx.fillStyle = colorMix('#ffffff', 0.35);
+ctx.font = `${14*scale}px Inter, system-ui, sans-serif`;
+ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+ctx.fillText('Goal', W/2, rowY(0) + rowH(0.5));
 
+  }
+function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
   function updateHud(){
     overlay.querySelector('#hudTime').textContent = timeNow.toFixed(1);
     overlay.querySelector('#hudLives').textContent = lives;

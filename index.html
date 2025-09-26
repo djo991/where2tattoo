@@ -164,16 +164,11 @@ body{
 #closeGame:hover{ background:color-mix(in oklab,var(--fg) 6%,var(--bg)) }
 
 /* on-screen d-pad (always grid; never switches to flex) */
-#gameDpad{
-  position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
-  display:grid; gap:8px; z-index:3;
-  grid-template-columns:repeat(3,48px); grid-template-rows:repeat(3,48px);
-  grid-template-areas:
-    ". up ."
-    "left . right"
-    ". down .";
-  /* don’t block the game canvas; only buttons receive clicks */
-  pointer-events:none;
+/* D-pad visibility: hide by default, show on touch devices */
+#gameDpad{ display:none; }  /* override the base rule */
+
+@media (pointer: coarse), (hover: none) {
+  #gameDpad{ display:grid; }
 }
 #gameDpad button{
   width:48px; height:48px; border-radius:12px;
@@ -699,6 +694,9 @@ body{
     dpad.querySelectorAll('button').forEach(b=>{
       b.addEventListener('click', ()=> movePlayer(+b.dataset.dx, +b.dataset.dy));
     });
+    const isTouch = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+dpad.style.display = isTouch ? 'grid' : 'none';
+dpad.setAttribute('aria-hidden', isTouch ? 'false' : 'true');
     addEventListener('resize', resizeCanvas);
     resizeCanvas();
   }

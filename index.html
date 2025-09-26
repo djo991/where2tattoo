@@ -134,6 +134,13 @@ body{
   align-items:center; justify-content:center;
   background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.85));
 }
+  #closeGame{
+  position:absolute; top:10px; right:10px;
+  width:40px; height:40px; border-radius:10px;
+  border:1px solid var(--line); background:var(--bg); color:var(--fg);
+  font-size:18px; font-weight:800; cursor:pointer;
+}
+#closeGame:hover{ background: color-mix(in oklab, var(--fg) 6%, var(--bg)); }
 #gameWrap{
   position:relative; width:min(92vw,840px); height:min(66vh,560px);
   border:1px solid var(--line); border-radius:16px; background:var(--bg-soft);
@@ -181,7 +188,7 @@ body{
         <button class="button ghost" id="hintBtn">Need a hint?</button>
       </div>
       <div class="msg" id="msg" role="status">
-        Type the code and press <b>Unlock</b>. </br><small>(Pro tip: you can also try Raiden’s Electric Fly — it might not solve anything, but it’s fun!)</small>
+        Type the code and press <b>Unlock</b>. </br><small>(Pro tip: you can also try Raiden’s Electric Fly — it might not solve anything, but it’s fun! Or you could try the unstoppable catterpillar of GTA IV.)</small>
       </div>
 
       <div class="reveal" id="reveal">
@@ -573,46 +580,45 @@ body{
   // Create overlay on demand
   let overlay, wrap, hud, cvs, ctx, dpad;
   function ensureOverlay(){
-    if (overlay) return;
-    overlay = document.createElement('div'); overlay.id = 'gameOverlay';
-    overlay.innerHTML = `
-      <div id="gameWrap">
-        <div id="gameHud">
-          <div class="pill" id="hudLeft">
-            ⏱ <span id="hudTime">0.0</span>s • ❤️ <span id="hudLives">3</span>
-          </div>
-          <div class="pill">
-            <button class="btn" id="btnRestart">⟳ Restart</button>
-            <button class="btn" id="btnExit">✕ Exit</button>
-          </div>
+  if (overlay) return;
+  overlay = document.createElement('div'); overlay.id = 'gameOverlay';
+  overlay.innerHTML = `
+    <div id="gameWrap">
+      <button id="closeGame" aria-label="Close game">✕</button>
+      <div id="gameHud">
+        <div class="pill" id="hudLeft">
+          ⏱ <span id="hudTime">0.0</span>s • ❤️ <span id="hudLives">3</span>
         </div>
-        <canvas id="gameCanvas"></canvas>
-        <div id="gameDpad" aria-hidden="false">
-          <button data-dx="0" data-dy="-1">↑</button>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; gap:8px;">
-              <button data-dx="-1" data-dy="0">←</button>
-              <button data-dx="1" data-dy="0">→</button>
-            </div>
-            <button data-dx="0" data-dy="1">↓</button>
-          </div>
+        <div class="pill">
+          <button class="btn" id="btnRestart">⟳ Restart</button>
         </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    wrap = overlay.querySelector('#gameWrap');
-    hud  = overlay.querySelector('#gameHud');
-    cvs  = overlay.querySelector('#gameCanvas');
-    ctx  = cvs.getContext('2d', { alpha:false });
-    dpad = overlay.querySelector('#gameDpad');
+      </div>
+      <canvas id="gameCanvas"></canvas>
+      <div id="gameDpad" aria-hidden="false">
+        <button data-dx="0" data-dy="-1">↑</button>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:8px;">
+            <button data-dx="-1" data-dy="0">←</button>
+            <button data-dx="1" data-dy="0">→</button>
+          </div>
+          <button data-dx="0" data-dy="1">↓</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  wrap = overlay.querySelector('#gameWrap');
+  hud  = overlay.querySelector('#gameHud');
+  cvs  = overlay.querySelector('#gameCanvas');
+  ctx  = cvs.getContext('2d', { alpha:false });
+  dpad = overlay.querySelector('#gameDpad');
 
-    overlay.addEventListener('click', (e)=>{ e.stopPropagation(); }); // keep overlay clicks inside
-    overlay.querySelector('#btnExit').addEventListener('click', stopPanzer);
-    overlay.querySelector('#btnRestart').addEventListener('click', resetGame);
-    dpad.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click', ()=> movePlayer(parseInt(b.dataset.dx,10), parseInt(b.dataset.dy,10)));
-    });
-    window.addEventListener('resize', resizeCanvas);
-  }
+  overlay.querySelector('#closeGame').addEventListener('click', stopPanzer);
+  overlay.querySelector('#btnRestart').addEventListener('click', resetGame);
+  dpad.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=> movePlayer(parseInt(b.dataset.dx,10), parseInt(b.dataset.dy,10)));
+  });
+  window.addEventListener('resize', resizeCanvas);
+}
 
   // Public launcher
   window.startPanzer = function startPanzer(){
@@ -677,55 +683,100 @@ body{
   }
 
   function drawRoad(){
-    // safe zones
-    ctx.fillStyle = colorMix('#ffffff', 0.02);
-    rect(0, 0, W, rowH(ROWS-2));                // goal area
-    rect(0, rowY(2), W, rowH(ROWS-2));          // start area
+  // safe zones (start & goal)
+  ctx.fillStyle = colorMix('#ffffff', 0.06);
+  rect(0, 0, W, rowH(ROWS-2));                // goal area (top two rows)
+  rect(0, rowY(2), W, rowH(ROWS-2));          // start area (bottom two rows)
 
-    // asphalt
-    ctx.fillStyle = colorMix('#000000', 0.65);
-    rect(0, rowY(3), W, rowH(7));
+  // asphalt (middle rows 3..10)
+  ctx.fillStyle = colorMix('#000000', 0.32);
+  rect(0, rowY(3), W, rowH(8));
 
-    // lane separators
-    ctx.strokeStyle = colorMix('#ffffff', 0.10);
-    ctx.setLineDash([10,12]);
-    for (let r=3;r<=10;r++){
-      const y = rowY(r) + rowH(1)/2;
-      line(0, y, W, y);
+  // alternating lane bands for contrast
+  for (let r=3; r<=10; r++){
+    if (r % 2 === 1){ // odd rows slightly lighter
+      ctx.fillStyle = colorMix('#ffffff', 0.04);
+      rect(0, rowY(r), W, rowH(1));
     }
-    ctx.setLineDash([]);
   }
+
+  // lane separators (brighter dashed)
+  ctx.strokeStyle = colorMix('#ffffff', 0.35);
+  ctx.setLineDash([12,14]);
+  ctx.lineWidth = 2;
+  for (let r=3;r<=10;r++){
+    const y = rowY(r) + rowH(1)/2;
+    line(0, y, W, y);
+  }
+  ctx.setLineDash([]);
+
+  // finish stripe at the top of goal
+  const finishY = rowY(ROWS-1);
+  ctx.fillStyle = colorMix('#ffffff', 0.30);
+  rect(0, finishY, W, rowH(0.20));
+}
+
 
   function drawTank(x, y){
-    const gx = colX(x), gy = rowY(y);
-    const w = CELL*scale*0.9, h = CELL*scale*0.9;
-    ctx.save();
-    ctx.translate(gx + CELL*scale/2, gy + CELL*scale/2);
-    // body
-    ctx.fillStyle = colorMix('#96a0ff', 0.45);
-    roundRect(-w*0.35, -h*0.20, w*0.70, h*0.40, 6, true);
-    // tracks
-    ctx.fillStyle = colorMix('#000000', 0.75);
-    roundRect(-w*0.40, -h*0.28, w*0.80, h*0.18, 6, true);
-    roundRect(-w*0.40,  h*0.10, w*0.80, h*0.18, 6, true);
-    // turret + barrel
-    ctx.fillStyle = colorMix('#c8d0ff', 0.60);
-    roundRect(-w*0.12, -h*0.12, w*0.24, h*0.24, 6, true);
-    ctx.fillRect(w*0.12, -h*0.03, w*0.35, h*0.06);
-    ctx.restore();
-  }
+  const s = CELL*scale;
+  const gx = colX(x), gy = rowY(y);
+
+  // highlight the cell so you always see where you are
+  ctx.fillStyle = colorMix('#89ffd9', 0.12);
+  roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, true);
+  ctx.strokeStyle = colorMix('#ffffff', 0.55);
+  ctx.lineWidth = 2;
+  roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, false);
+
+  // tank body
+  ctx.save();
+  ctx.translate(gx + s/2, gy + s/2);
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = 'rgba(255,255,255,.25)';
+
+  // tracks
+  ctx.fillStyle = colorMix('#000000', 0.75);
+  roundRect(-s*0.40, -s*0.28, s*0.80, s*0.18, 6, true);
+  roundRect(-s*0.40,  s*0.10, s*0.80, s*0.18, 6, true);
+
+  // hull
+  ctx.fillStyle = colorMix('#7cf7d4', 0.95);
+  roundRect(-s*0.35, -s*0.20, s*0.70, s*0.40, 8, true);
+
+  // turret + barrel
+  ctx.fillStyle = colorMix('#9b8cff', 0.95);
+  roundRect(-s*0.12, -s*0.12, s*0.24, s*0.24, 6, true);
+  ctx.fillRect( s*0.12, -s*0.03, s*0.35, s*0.06 );
+
+  ctx.restore();
+
+  // crisp outer outline
+  ctx.strokeStyle = colorMix('#ffffff', 0.70);
+  ctx.lineWidth = 1.8;
+  roundRect(gx + s*0.06, gy + s*0.06, s*0.88, s*0.88, 10, false);
+}
+
 
   function drawCar(lane, car){
-    const y = lane.y;
-    const gx = car.x;
-    const gy = rowY(y) + CELL*scale*0.12;
-    const h = CELL*scale*0.76;
-    ctx.fillStyle = colorMix('#89ffd9', 0.25);
-    roundRect(gx, gy, car.w, h, 10, true);
-    ctx.strokeStyle = colorMix('#ffffff', 0.12);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(gx, gy, car.w, h);
-  }
+  const y = lane.y;
+  const gx = car.x;
+  const gy = rowY(y) + CELL*scale*0.12;
+  const h = CELL*scale*0.76;
+
+  // bright body with subtle glow
+  ctx.save();
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(255,255,255,.25)';
+  ctx.fillStyle = colorMix(lane.dir > 0 ? '#7cf7d4' : '#9b8cff', 0.80);
+  roundRect(gx, gy, car.w, h, 10, true);
+  ctx.restore();
+
+  // outline
+  ctx.strokeStyle = colorMix('#000000', 0.55);
+  ctx.lineWidth = 2;
+  roundRect(gx, gy, car.w, h, 10, false);
+}
+
 
   // ===== Math helpers =====
   function colX(c){ return c * CELL * scale; }

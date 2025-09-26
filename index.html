@@ -602,28 +602,27 @@ body{
   }
   tick();
 }
-
-// game
-
-  /* ===== PANZER MINI-GAME (hardened) ===== */
+/* ===== PANZER MINI-GAME (centered grid + scaled cars) ===== */
 (function(){
   const REDUCE_MOTION = matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // DOM refs (one overlay only)
+  // DOM refs
   let overlay=null, wrap=null, cvs=null, ctx=null, dpad=null;
 
-  // Grid + sizing
+  // Grid
   const COLS=11, ROWS=12, CELL=48;
-  let W=COLS*CELL, H=ROWS*CELL, scale=1, GRID_W=COLS*CELL*1; // GRID_W updated after resize
+  let W=COLS*CELL, H=ROWS*CELL;
+  let scale=1, prevScale=1;
+  let GRID_W=COLS*CELL, GRID_H=ROWS*CELL;
+  let X0=0, Y0=0;                      // grid top-left inside the canvas
 
-  // Player / state
+  // Player/state
   const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 };
   let px, py, lives, t0, timeNow, running=false, raf=null, lastTime=0;
 
-  // Lanes
+  // Lanes/cars
   const lanes=[];
 
-  // Palette
   function palette(){
     const light = document.documentElement.getAttribute('data-theme') === 'light';
     return light ? {
@@ -637,7 +636,6 @@ body{
     };
   }
 
-  // Build / spawn
   function buildLanes(){
     lanes.length=0;
     [
@@ -651,24 +649,25 @@ body{
       {row:2, dir:-1, speed:2.4, density:.22},
     ].forEach(s => lanes.push({...s, cars:[]}));
   }
+
+  // Spawn cars in **scaled** units so drawing/motion/warp agree
   function spawnCars(){
     lanes.forEach(l=>{
       l.cars.length=0;
-      const span = COLS + 6, count = Math.max(2, Math.floor(span*l.density));
+      const span = COLS + 6;
+      const count = Math.max(2, Math.floor(span * l.density));
       for (let i=0;i<count;i++){
-        const w = (1.5 + Math.random()*1.3) * CELL;
-        const x = (Math.random()*span - 3) * CELL;
+        const w = (1.5 + Math.random()*1.3) * CELL * scale;               // scaled
+        const x = (Math.random()*span - 3) * CELL * scale;                 // scaled
         l.cars.push({ x, w });
       }
     });
   }
 
-  // Kill any stray overlays from previous runs (fixes "stuck after Close")
   function purgeOldOverlays(){
     document.querySelectorAll('#gameOverlay').forEach(el=>el.remove());
   }
 
-  // DOM overlay
   function ensureOverlay(){
     if (overlay) return;
     overlay = document.createElement('div');
@@ -703,6 +702,7 @@ body{
     addEventListener('resize', resizeCanvas);
     resizeCanvas();
   }
+
   function removeOverlay(){
     if (!overlay) return;
     removeEventListener('resize', resizeCanvas);
@@ -710,15 +710,13 @@ body{
     overlay=null; wrap=cvs=ctx=dpad=null;
   }
 
-  // Public start
   window.startPanzer = function(){
-    purgeOldOverlays();            // <- important
+    purgeOldOverlays();
     ensureOverlay();
     overlay.style.display = 'grid';
     begin();
   };
 
-  // Close + teardown
   function stopPanzer(){
     running=false;
     if (raf) cancelAnimationFrame(raf);
@@ -726,17 +724,31 @@ body{
     removeOverlay();
   }
 
-  // Geometry / helpers
+  // Geometry helpers – now include X0/Y0 offset so the grid is centered
   function resizeCanvas(){
     const r=wrap.getBoundingClientRect();
     W=r.width; H=r.height;
-    scale=Math.min(W/(COLS*CELL), H/(ROWS*CELL));
-    GRID_W = COLS*CELL*scale;            // use grid width, not wrap width
+
+    const newScale = Math.min(W/(COLS*CELL), H/(ROWS*CELL));
+    const factor   = lanes.length ? (newScale/scale) : 1;
+
+    // keep cars sized/positioned when scale changes
+    lanes.forEach(l => l.cars.forEach(c => { c.x *= factor; c.w *= factor; }));
+
+    prevScale = scale;
+    scale = newScale;
+
+    GRID_W = COLS*CELL*scale;
+    GRID_H = ROWS*CELL*scale;
+    X0 = (W - GRID_W)/2;
+    Y0 = (H - GRID_H)/2;
+
     cvs.width=W; cvs.height=H;
   }
-  const colX = c => c * CELL * scale;
-  const rowY = r => r * CELL * scale; // 0 = top
-  const rowH = n => n * CELL * scale;
+
+  const colX = c => X0 + c * CELL * scale;
+  const rowY = r => Y0 + r * CELL * scale;
+  const rowH = n =>        n * CELL * scale;
   const rect = (x,y,w,h)=> ctx.fillRect(x,y,w,h);
   function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
   function roundRect(x,y,w,h,r,fill){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); fill?ctx.fill():ctx.stroke(); }
@@ -744,18 +756,19 @@ body{
   const clamp = (v,min,max)=> v<min?min:(v>max?max:v);
   const rectsOverlap = (ax,ay,aw,ah,bx,by,bw,bh)=> ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
 
-  // Draw
+  // Drawing – use GRID_W/GRID_H and X0/Y0 (not W/H) for the road
   function drawRoad(){
     const p=palette();
-    ctx.fillStyle=p.safe;   rect(0, rowY(0), W, rowH(2));                 // top safe
-    rect(0, rowY(ROWS-2), W, rowH(2));                                    // bottom safe
-    ctx.fillStyle=p.asphalt; rect(0, rowY(2), W, rowH(ROWS-4));            // road
-    for(let r=2;r<ROWS-2;r++){ if(r%2===1){ ctx.fillStyle=p.asphaltAlt; rect(0,rowY(r),W,rowH(1)); } }
+    ctx.fillStyle=p.safe;   rect(X0, rowY(0), GRID_W, rowH(2));               // top safe
+                            rect(X0, rowY(ROWS-2), GRID_W, rowH(2));           // bottom safe
+    ctx.fillStyle=p.asphalt; rect(X0, rowY(2), GRID_W, rowH(ROWS-4));          // road
+    for(let r=2;r<ROWS-2;r++){ if(r%2===1){ ctx.fillStyle=p.asphaltAlt; rect(X0,rowY(r),GRID_W,rowH(1)); } }
     ctx.strokeStyle=p.lane; ctx.setLineDash([12,12]); ctx.lineWidth=2;
-    for(let r=2;r<ROWS-2;r++){ const y=rowY(r)+rowH(1)/2; line(0,y,W,y); }
+    for(let r=2;r<ROWS-2;r++){ const y=rowY(r)+rowH(1)/2; line(X0,y,X0+GRID_W,y); }
     ctx.setLineDash([]);
-    ctx.fillStyle=p.finish; rect(0, rowY(2)-rowH(.15), W, rowH(.15));     // finish stripe
+    ctx.fillStyle=p.finish; rect(X0, rowY(2)-rowH(.15), GRID_W, rowH(.15));    // finish stripe
   }
+
   function drawTank(x,y){
     const p=palette(), s=CELL*scale, gx=colX(x), gy=rowY(y);
     ctx.fillStyle=p.highlight; roundRect(gx+s*.06, gy+s*.06, s*.88, s*.88, 10, true);
@@ -764,8 +777,9 @@ body{
     ctx.fillStyle=p.tankHull;   roundRect(gx+s*.18, gy+s*.30, s*.64, s*.40, 8, true);
     ctx.fillStyle=p.tankTurret; roundRect(gx+s*.40, gy+s*.38, s*.26, s*.24, 6, true); ctx.fillRect(gx+s*.66, gy+s*.46, s*.32, s*.08);
   }
+
   function drawCar(lane,car){
-    const p=palette(), gx=car.x, gy=rowY(lane.y)+CELL*scale*.12, h=CELL*scale*.76;
+    const p=palette(), gx=X0 + car.x, gy=rowY(lane.y)+CELL*scale*.12, h=CELL*scale*.76;
     ctx.save(); ctx.shadowBlur=10; ctx.shadowColor='rgba(255,255,255,.25)';
     ctx.fillStyle = lane.dir>0 ? p.carA : p.carB; roundRect(gx,gy,car.w,h,10, true); ctx.restore();
     ctx.strokeStyle=p.outline; ctx.lineWidth=2; roundRect(gx,gy,car.w,h,10,false);
@@ -802,7 +816,11 @@ body{
 
   // Loop
   function begin(){
-    buildLanes(); spawnCars();
+    buildLanes();
+    // ensure geometry (and scale) are set before spawning
+    resizeCanvas();
+    spawnCars();
+
     px=START_POS.x; py=START_POS.y; lives=3; t0=performance.now(); timeNow=0;
     addEventListener('keydown', onKey);
     running=true; lastTime=performance.now(); tick();
@@ -817,7 +835,7 @@ body{
     const now=performance.now(), dt=Math.min(32, now-lastTime)/1000; lastTime=now;
     timeNow=(now-t0)/1000;
 
-    // cars (wrap using GRID_W, not W)
+    // move + wrap using GRID_W (logical width)
     lanes.forEach(l=>{
       const v=l.speed*CELL*scale*l.dir, off=3*CELL*scale;
       l.cars.forEach(c=>{
@@ -827,14 +845,14 @@ body{
       });
     });
 
-    // collisions: road rows 2..9
+    // collisions only on road rows 2..9
     if(py>=2 && py<=9){
       const lane=lanes.find(L=>L.y===py);
       if(lane){
         const pxPix=colX(px)+CELL*scale*.15, pwPix=CELL*scale*.70;
         const pyPix=rowY(py)+CELL*scale*.10, phPix=CELL*scale*.80;
         for(const c of lane.cars){
-          if(rectsOverlap(pxPix,pyPix,pwPix,phPix, c.x, rowY(py)+CELL*scale*.12, c.w, CELL*scale*.76)){
+          if(rectsOverlap(pxPix,pyPix,pwPix,phPix, X0+c.x, rowY(py)+CELL*scale*.12, c.w, CELL*scale*.76)){
             lives--; sfx('boom'); px=START_POS.x; py=START_POS.y;
             if(lives<=0){ gameOver(false); return; }
             break;
@@ -849,12 +867,15 @@ body{
   function drawScene(){
     ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg');
     ctx.fillRect(0,0,W,H);
+
     drawRoad();
     lanes.forEach(l=>l.cars.forEach(c=>drawCar(l,c)));
     drawTank(px,py);
-    ctx.fillStyle=colorMix('#89ffd9', .18); rect(0,rowY(0),W,rowH(1));
+
+    // “Goal” banner at top
+    ctx.fillStyle=colorMix('#89ffd9', .18); rect(X0, rowY(0), GRID_W, rowH(1));
     ctx.fillStyle=colorMix('#ffffff', .35); ctx.font=`${14*scale}px Inter, system-ui, sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Goal', W/2, rowY(0)+rowH(.5));
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Goal', X0 + GRID_W/2, rowY(0)+rowH(.5));
   }
   function updateHud(){
     overlay.querySelector('#hudTime').textContent=timeNow.toFixed(1);

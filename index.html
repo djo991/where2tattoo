@@ -616,7 +616,8 @@ body{
 
   // Player/state
   const START_POS = { x: Math.floor(COLS/2), y: ROWS-1 };
-  const speedMultiplier = 1.1;
+  let difficulty = 1;                 // current multiplier
+  const DIFFICULTY_STEP = 1.20;       // +10% each win
   let px, py, lives, t0, timeNow, running=false, raf=null, lastTime=0;
 
   // Lanes/cars
@@ -711,6 +712,7 @@ body{
     purgeOldOverlays();
     ensureOverlay();
     overlay.style.display = 'grid';
+     difficulty = 1;
     begin();
   };
 
@@ -829,7 +831,7 @@ body{
 
     // Move + wrap using full width W
     lanes.forEach(l=>{
-      const v = l.speed * cellW * l.dir * speedMultiplier;
+      const v = l.speed * cellW * l.dir * difficulty;
   const off = 2 * cellW;                   // wrap buffer
   l.cars.forEach(c=>{
     c.x += v * dt;
@@ -876,6 +878,7 @@ body{
 
   function gameOver(win){
     running=false; if(raf) cancelAnimationFrame(raf); sfx(win?'win':'boom');
+    if (win) difficulty *= DIFFICULTY_STEP;
     const banner=document.createElement('div');
     Object.assign(banner.style,{position:'absolute',inset:'0',display:'grid',placeItems:'center',
       background:'rgba(0,0,0,.45)', color:'var(--fg)', fontWeight:'800',

@@ -95,6 +95,32 @@ body{
 /* logo image if you’re using it */
 .logo-img{height:36px;width:auto;display:block}
 
+.theme-fab{
+  position: fixed !important;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 44px; height: 44px; border-radius: 999px;
+  z-index: 1000;
+  background: color-mix(in oklab, var(--bg) 80%, transparent);
+  border: 1px solid color-mix(in oklab, var(--fg) 14%, transparent);
+  backdrop-filter: blur(8px);
+}
+@media (max-width:640px){
+  /* make header pills wrap nicely without the toggle in there */
+  .header-actions{ flex-wrap: wrap; row-gap: 8px }
+  .button.small{ padding:6px 10px; font-size:.92rem }
+}
+
+  @media (max-width:640px){
+  .puzzle{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .puzzle input{ width: 100% }
+  .puzzle .button{ width: 100%; justify-content: center }
+}
+  
 /* Mobile header polish + floating theme toggle */
 @media (max-width: 640px){
   header{
@@ -323,7 +349,24 @@ body{
       });
     }
   })();
+ (function(){
+    const btn = document.getElementById('themeToggle');
+    const headerActions = document.querySelector('.header-actions');
+    const mq = matchMedia('(max-width: 640px)');
 
+    function relocate() {
+      if (!btn || !headerActions) return;
+      if (mq.matches) {              // mobile → FAB
+        document.body.appendChild(btn);
+        btn.classList.add('theme-fab');
+      } else {                       // desktop → back in header
+        headerActions.appendChild(btn);
+        btn.classList.remove('theme-fab');
+      }
+    }
+    mq.addEventListener('change', relocate);
+    relocate();
+  })();
   
   // ——— Basic UI wiring ———  
   document.getElementById("year").textContent = new Date().getFullYear();
